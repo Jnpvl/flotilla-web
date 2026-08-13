@@ -1,59 +1,41 @@
-# FlotlaWeb
+# Flotilla Web
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.1.3.
+Panel Angular (admin / operaciones).
 
-## Development server
-
-To start a local development server, run:
+## Desarrollo local
 
 ```bash
-ng serve
+npm start
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+Usa `src/environments/environment.development.ts` → `http://localhost:3001/api/v1`.
 
-## Code scaffolding
+## Build / Vercel
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+En el build se ejecuta `scripts/set-env.mjs`, que escribe `environment.ts` con la URL de la API.
+
+### Variable en Vercel
+
+| Nombre   | Ejemplo                                      |
+|----------|----------------------------------------------|
+| `API_URL` | `https://tu-api.ejemplo.com/api/v1`         |
+
+También acepta `NG_APP_API_URL` como alias.
+
+Sin variable, cae a `http://localhost:3001/api/v1` (solo útil en local).
+
+### Deploy
+
+1. Sube este proyecto (`flotla-web`) a un repo.
+2. En Vercel: Framework Preset **Other**, Root Directory `flotla-web` (si el repo es el monorepo).
+3. Build Command: `npm run build` (ya está en `vercel.json`).
+4. Output: `dist/flotla-web/browser`.
+5. Define `API_URL` apuntando a tu API **pública** (HTTPS).
+
+### API (CORS)
+
+En la API configura orígenes permitidos, por ejemplo:
 
 ```bash
-ng generate component component-name
+CORS_ORIGINS=http://localhost:4200,https://tu-app.vercel.app
 ```
-
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
-
-```bash
-ng generate --help
-```
-
-## Building
-
-To build the project run:
-
-```bash
-ng build
-```
-
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.

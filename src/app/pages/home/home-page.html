@@ -1,0 +1,90 @@
+<section>
+  <header class="mb-5">
+    <h1 class="m-0 text-xl font-semibold text-gray-800">Inicio</h1>
+    @if (auth.user(); as user) {
+      <p class="mt-1 text-sm text-gray-500">
+        Hola, <strong class="text-gray-800">{{ user.nombre }}</strong> · vista operativa del día
+      </p>
+    }
+  </header>
+
+  @if (loading()) {
+    <p class="rounded-lg border border-gray-200 bg-white p-8 text-center text-gray-500">
+      Cargando indicadores…
+    </p>
+  } @else if (stats(); as s) {
+    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <article class="rounded-lg border border-gray-200 bg-white p-4">
+        <p class="m-0 text-xs font-semibold uppercase tracking-wide text-gray-500">Rutas totales</p>
+        <p class="mt-2 text-2xl font-semibold text-gray-900">{{ s.rutasTotales }}</p>
+      </article>
+      <article class="rounded-lg border border-gray-200 bg-white p-4">
+        <p class="m-0 text-xs font-semibold uppercase tracking-wide text-gray-500">Rutas del día</p>
+        <p class="mt-2 text-2xl font-semibold text-gray-900">{{ s.rutasHoy }}</p>
+      </article>
+      <article class="rounded-lg border border-gray-200 bg-white p-4">
+        <p class="m-0 text-xs font-semibold uppercase tracking-wide text-gray-500">Rutas activas</p>
+        <p class="mt-2 text-2xl font-semibold text-gray-900">{{ s.rutasActivas }}</p>
+      </article>
+      <article class="rounded-lg border border-gray-200 bg-white p-4">
+        <p class="m-0 text-xs font-semibold uppercase tracking-wide text-gray-500">Choferes en ruta hoy</p>
+        <p class="mt-2 text-2xl font-semibold text-gray-900">{{ s.choferesActivosHoy }}</p>
+      </article>
+
+      <article class="rounded-lg border border-gray-200 bg-white p-4">
+        <p class="m-0 text-xs font-semibold uppercase tracking-wide text-gray-500">Km totales</p>
+        <p class="mt-2 text-2xl font-semibold text-gray-900">{{ s.kmTotales }}</p>
+      </article>
+      <article class="rounded-lg border border-gray-200 bg-white p-4">
+        <p class="m-0 text-xs font-semibold uppercase tracking-wide text-gray-500">Km del día</p>
+        <p class="mt-2 text-2xl font-semibold text-gray-900">{{ s.kmHoy }}</p>
+      </article>
+      <article class="rounded-lg border border-gray-200 bg-white p-4">
+        <p class="m-0 text-xs font-semibold uppercase tracking-wide text-gray-500">
+          Promedio tiempo de ruta
+        </p>
+        <p class="mt-2 text-2xl font-semibold text-gray-900">
+          {{ formatMinutos(s.promedioMinutosRuta) }}
+        </p>
+      </article>
+      <article class="rounded-lg border border-gray-200 bg-white p-4">
+        <p class="m-0 text-xs font-semibold uppercase tracking-wide text-gray-500">
+          Entregados hoy
+        </p>
+        <p class="mt-2 text-2xl font-semibold text-gray-900">{{ s.pedidosEntregadosHoy }}</p>
+      </article>
+
+      <article class="rounded-lg border border-gray-200 bg-white p-4">
+        <p class="m-0 text-xs font-semibold uppercase tracking-wide text-gray-500">
+          Pedidos pendientes
+        </p>
+        <p class="mt-2 text-2xl font-semibold text-gray-900">{{ s.pedidosPendientes }}</p>
+      </article>
+      <article class="rounded-lg border border-gray-200 bg-white p-4">
+        <p class="m-0 text-xs font-semibold uppercase tracking-wide text-gray-500">Pedidos en ruta</p>
+        <p class="mt-2 text-2xl font-semibold text-gray-900">{{ s.pedidosEnRuta }}</p>
+      </article>
+    </div>
+  }
+
+  <div class="mt-5 flex flex-wrap gap-2">
+    <a
+      routerLink="/rutas"
+      class="rounded-md bg-blue-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-blue-700"
+    >
+      Ver rutas de hoy
+    </a>
+    <a
+      routerLink="/pedidos"
+      class="rounded-md border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-800 hover:border-blue-300 hover:text-blue-600"
+    >
+      Pedidos
+    </a>
+    <a
+      routerLink="/usuarios"
+      class="rounded-md border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-800 hover:border-blue-300 hover:text-blue-600"
+    >
+      Usuarios
+    </a>
+  </div>
+</section>

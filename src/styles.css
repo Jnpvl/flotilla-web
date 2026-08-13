@@ -1,1 +1,22 @@
-/* You can add global styles to this file, and also import other style files */
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans", "Segoe UI", sans-serif;
+}
+
+html,
+body {
+  @apply m-0 h-full overflow-hidden;
+}
+
+body {
+  @apply bg-gray-100 text-sm text-gray-800 antialiased;
+  font-family: var(--font-sans);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}

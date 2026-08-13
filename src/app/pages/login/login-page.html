@@ -1,0 +1,43 @@
+<section class="grid h-svh place-items-center overflow-y-auto bg-gray-100 p-6">
+  <div class="w-full max-w-sm rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+    <p class="m-0 text-xl font-bold text-gray-900">Flotilla</p>
+    <h1 class="mt-4 text-base font-semibold text-gray-900">Entrar al sistema</h1>
+    <p class="mt-1 text-sm text-gray-500">Usa tu usuario y contraseña para continuar.</p>
+
+    <form class="mt-5 grid gap-3.5" [formGroup]="form" (ngSubmit)="submit()">
+      <label class="grid gap-1">
+        <span class="text-xs font-medium text-gray-600">Usuario</span>
+        <input
+          type="text"
+          formControlName="username"
+          autocomplete="username"
+          placeholder="tu.usuario"
+          class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 outline-none focus:border-blue-300 focus:ring-3 focus:ring-blue-600/15"
+        />
+      </label>
+
+      <label class="grid gap-1">
+        <span class="text-xs font-medium text-gray-600">Contraseña</span>
+        <input
+          type="password"
+          formControlName="password"
+          autocomplete="current-password"
+          placeholder="••••••••"
+          class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 outline-none focus:border-blue-300 focus:ring-3 focus:ring-blue-600/15"
+        />
+      </label>
+
+      @if (error()) {
+        <p class="m-0 text-sm text-red-700" role="alert">{{ error() }}</p>
+      }
+
+      <button
+        class="mt-1 rounded-md bg-blue-600 px-4 py-2.5 font-semibold text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-65"
+        type="submit"
+        [disabled]="loading()"
+      >
+        {{ loading() ? 'Entrando…' : 'Entrar' }}
+      </button>
+    </form>
+  </div>
+</section>
