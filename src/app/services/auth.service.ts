@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { Observable, tap } from 'rxjs';
+import { Observable, catchError, finalize, map, of, tap } from 'rxjs';
 import { ApiClient } from './api-client';
 
 export type AuthUser = {
@@ -8,6 +8,7 @@ export type AuthUser = {
   nombre: string;
   username: string;
   rol: string;
+  agenteContpaqId?: number | null;
 };
 
 export type LoginResponse = {
@@ -25,6 +26,8 @@ export class AuthService {
 
   private readonly userSignal = signal<AuthUser | null>(this.readUser());
   private readonly tokenSignal = signal<string | null>(this.readToken());
+  private sessionValidated = false;
+  private sessionCheck$: Observable<boolean> | null = null;
 
   readonly user = this.userSignal.asReadonly();
   readonly token = this.tokenSignal.asReadonly();
@@ -37,18 +40,61 @@ export class AuthService {
         localStorage.setItem(USER_KEY, JSON.stringify(response.user));
         this.tokenSignal.set(response.accessToken);
         this.userSignal.set(response.user);
+        this.sessionValidated = true;
+        this.sessionCheck$ = null;
       }),
     );
   }
 
+  /**
+   * Confirma contra la API que el token y el usuario siguen siendo válidos.
+   * Si no, limpia la sesión local.
+   */
+  ensureSession(): Observable<boolean> {
+    if (!this.tokenSignal()) {
+      this.sessionValidated = false;
+      return of(false);
+    }
+    if (this.sessionValidated && this.userSignal()) {
+      return of(true);
+    }
+    if (this.sessionCheck$) {
+      return this.sessionCheck$;
+    }
+
+    this.sessionCheck$ = this.api.get<AuthUser>('/auth/me').pipe(
+      tap((user) => {
+        localStorage.setItem(USER_KEY, JSON.stringify(user));
+        this.userSignal.set(user);
+        this.sessionValidated = true;
+      }),
+      map(() => true),
+      catchError(() => {
+        this.clearLocalSession();
+        return of(false);
+      }),
+      finalize(() => {
+        this.sessionCheck$ = null;
+      }),
+    );
+
+    return this.sessionCheck$;
+  }
+
   logout(): void {
+    this.clearLocalSession();
+    if (!this.router.url.startsWith('/login')) {
+      void this.router.navigateByUrl('/login');
+    }
+  }
+
+  private clearLocalSession(): void {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     this.tokenSignal.set(null);
     this.userSignal.set(null);
-    if (!this.router.url.startsWith('/login')) {
-      void this.router.navigateByUrl('/login');
-    }
+    this.sessionValidated = false;
+    this.sessionCheck$ = null;
   }
 
   private readToken(): string | null {

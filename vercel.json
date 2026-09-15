@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "node scripts/set-env.mjs && npx ng build",
   "outputDirectory": "dist/flotla-web/browser",
   "framework": null,
   "rewrites": [

@@ -1,0 +1,689 @@
+<section class="pb-2">
+  <header class="mb-5 flex flex-wrap items-end justify-between gap-4">
+    <div class="min-w-0">
+      <h1 class="m-0 text-xl font-semibold text-brand-800">Visitas</h1>
+    </div>
+  </header>
+
+  @if (isAdmin()) {
+    <div class="mb-4">
+      <label class="grid max-w-xs gap-1">
+        <span class="text-xs font-medium text-gray-600">Filtrar asignado</span>
+        <select
+          class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
+          [ngModel]="filterVendedorId()"
+          [ngModelOptions]="{ standalone: true }"
+          (ngModelChange)="onVendedorFilter($event == null ? null : +$event)"
+        >
+          <option [ngValue]="null">Todos</option>
+          @for (v of vendedores(); track v.id) {
+            <option [ngValue]="v.id">
+              {{ v.nombre }}{{ v.rol === 'admin' ? ' (admin)' : '' }}
+            </option>
+          }
+        </select>
+      </label>
+    </div>
+  }
+
+  <!-- Calendario -->
+  <div class="mb-5 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+    <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50"
+          (click)="shiftMonth(-1)"
+          aria-label="Mes anterior"
+        >
+          ‹
+        </button>
+        <h2 class="m-0 min-w-[10rem] text-center text-base font-semibold text-gray-900">
+          {{ monthLabel() }}
+        </h2>
+        <button
+          type="button"
+          class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50"
+          (click)="shiftMonth(1)"
+          aria-label="Mes siguiente"
+        >
+          ›
+        </button>
+      </div>
+      <button
+        type="button"
+        class="rounded-md border border-brand-100 bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-800 hover:bg-brand-100"
+        (click)="goToday()"
+      >
+        Hoy
+      </button>
+    </div>
+
+    <div
+      class="mb-1 grid grid-cols-7 gap-1 text-center text-[11px] font-semibold uppercase tracking-wide text-gray-400"
+    >
+      @for (day of weekdays; track day) {
+        <div class="py-1">{{ day }}</div>
+      }
+    </div>
+
+    @if (loading()) {
+      <p class="py-8 text-center text-sm text-gray-500">Cargando calendario…</p>
+    } @else {
+      <div class="grid grid-cols-7 gap-1">
+        @for (cell of calendarCells(); track $index) {
+          @if (cell.date) {
+            <button
+              type="button"
+              class="flex min-h-12 flex-col items-center justify-center rounded-md border px-1 py-1.5 text-sm transition sm:min-h-14"
+              [class]="
+                cell.isSelected
+                  ? 'border-brand-600 bg-brand-700 text-white shadow-sm'
+                  : cell.isToday
+                    ? 'border-brand-200 bg-brand-50 text-brand-900'
+                    : 'border-transparent bg-gray-50/80 text-gray-800 hover:border-brand-100 hover:bg-white'
+              "
+              (click)="selectDay(cell.date)"
+            >
+              <span class="font-semibold leading-none">{{ cell.day }}</span>
+              @if (cell.count > 0) {
+                <span class="mt-1 flex items-center gap-0.5">
+                  @if (cell.planeadas > 0) {
+                    <span
+                      class="h-1.5 w-1.5 rounded-full"
+                      [class]="cell.isSelected ? 'bg-white/80' : 'bg-brand-600'"
+                    ></span>
+                  }
+                  @if (cell.visitadas > 0) {
+                    <span
+                      class="h-1.5 w-1.5 rounded-full"
+                      [class]="cell.isSelected ? 'bg-emerald-200' : 'bg-emerald-500'"
+                    ></span>
+                  }
+                  @if (cell.canceladas > 0) {
+                    <span
+                      class="h-1.5 w-1.5 rounded-full"
+                      [class]="cell.isSelected ? 'bg-rose-200' : 'bg-rose-400'"
+                    ></span>
+                  }
+                </span>
+              }
+            </button>
+          } @else {
+            <div class="min-h-12 sm:min-h-14"></div>
+          }
+        }
+      </div>
+      <div class="mt-3 flex flex-wrap gap-3 text-[11px] text-gray-500">
+        <span class="inline-flex items-center gap-1.5">
+          <span class="h-1.5 w-1.5 rounded-full bg-brand-600"></span> Planeada
+        </span>
+        <span class="inline-flex items-center gap-1.5">
+          <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> Visitada
+        </span>
+        <span class="inline-flex items-center gap-1.5">
+          <span class="h-1.5 w-1.5 rounded-full bg-rose-400"></span> Cancelada
+        </span>
+      </div>
+    }
+  </div>
+
+  <!-- Tabla del día seleccionado -->
+  <div class="mb-3 flex flex-wrap items-end justify-between gap-3">
+    <div class="min-w-0">
+      <h2 class="m-0 text-base font-semibold capitalize text-gray-900">
+        {{ selectedLabel() }}
+      </h2>
+      @if (!loading() && dayStats().total > 0) {
+        <p class="m-0 mt-0.5 text-xs text-gray-500">
+          {{ dayStats().total }} visita{{ dayStats().total === 1 ? '' : 's' }}
+          · {{ dayStats().planeadas }} planeada{{ dayStats().planeadas === 1 ? '' : 's' }}
+          · {{ dayStats().visitadas }} visitada{{ dayStats().visitadas === 1 ? '' : 's' }}
+          · {{ dayStats().canceladas }} cancelada{{ dayStats().canceladas === 1 ? '' : 's' }}
+        </p>
+      }
+    </div>
+    @if (canManage()) {
+      <button
+        type="button"
+        class="rounded-md border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-800 hover:bg-brand-100"
+        (click)="openCreate(selectedDate())"
+      >
+        + Agregar al día
+      </button>
+    }
+  </div>
+
+  @if (loading()) {
+    <p class="rounded-lg border border-gray-200 bg-white p-8 text-center text-gray-500">
+      Cargando visitas…
+    </p>
+  } @else if (dayVisitas().length === 0) {
+    <div class="rounded-lg border border-gray-200 bg-white p-8 text-center text-gray-500">
+      <p class="m-0">Sin visitas este día.</p>
+      @if (canManage()) {
+        <button
+          type="button"
+          class="mt-3 text-sm font-medium text-brand-700 hover:underline"
+          (click)="openCreate(selectedDate())"
+        >
+          Agendar visita
+        </button>
+      }
+    </div>
+  } @else {
+    <div class="overflow-x-auto overflow-y-hidden rounded-lg border border-gray-200 bg-white">
+      <table class="w-full min-w-[640px] border-collapse text-sm md:min-w-0">
+        <thead>
+          <tr>
+            <th
+              class="bg-gray-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500"
+            >
+              Hora
+            </th>
+            <th
+              class="bg-gray-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500"
+            >
+              Cliente
+            </th>
+            @if (isAdmin()) {
+              <th
+                class="bg-gray-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500"
+              >
+                Vendedor / asignado
+              </th>
+            }
+            <th
+              class="bg-gray-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500"
+            >
+              Estatus
+            </th>
+            <th
+              class="bg-gray-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500"
+            >
+              Detalle
+            </th>
+            <th
+              class="bg-gray-50 px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500"
+            >
+              Acciones
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (visita of dayVisitas(); track visita.id) {
+            <tr class="border-t border-gray-100 hover:bg-gray-50/80">
+              <td class="px-4 py-3 align-top tabular-nums text-gray-800">
+                {{ visita.horaPlanificada || '—' }}
+              </td>
+              <td class="px-4 py-3 align-top">
+                <div class="font-medium text-gray-900">{{ visita.clienteNombre }}</div>
+              </td>
+              @if (isAdmin()) {
+                <td class="px-4 py-3 align-top text-gray-600">
+                  {{ visita.vendedorNombre ?? '—' }}
+                </td>
+              }
+              <td class="px-4 py-3 align-top">
+                <span
+                  class="inline-flex rounded px-2 py-0.5 text-[11px] font-semibold"
+                  [class]="estatusClass(visita.estatus)"
+                >
+                  {{ estatusLabel(visita.estatus) }}
+                </span>
+              </td>
+              <td class="px-4 py-3 align-top">
+                @if (hasDetalle(visita)) {
+                  <button
+                    type="button"
+                    class="text-xs font-medium text-brand-700 hover:underline"
+                    (click)="openDetalle(visita)"
+                  >
+                    Ver detalle
+                  </button>
+                } @else {
+                  <span class="text-xs text-gray-400">—</span>
+                }
+              </td>
+              <td class="px-4 py-3 align-top text-right">
+                @if (canManage() && visita.estatus === 'planeada') {
+                  <div class="flex flex-wrap justify-end gap-2">
+                    <button
+                      type="button"
+                      class="text-xs font-medium text-emerald-700 hover:underline"
+                      (click)="askVisitada(visita)"
+                    >
+                      Visitada
+                    </button>
+                    <button
+                      type="button"
+                      class="text-xs font-medium text-brand-700 hover:underline"
+                      (click)="openEdit(visita)"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      class="text-xs font-medium text-rose-700 hover:underline"
+                      (click)="askCancelar(visita)"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      class="text-xs font-medium text-gray-500 hover:underline"
+                      (click)="askRemove(visita)"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                } @else {
+                  <span class="text-xs text-gray-400">—</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  @if (detailVisita(); as visita) {
+    <div
+      class="fixed inset-0 z-50 grid place-items-center bg-brand-900/45 p-4"
+      role="dialog"
+      aria-modal="true"
+      (click)="closeDetalle()"
+    >
+      <div
+        class="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-5 shadow-xl"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="m-0 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+              Detalle de visita
+            </p>
+            <h2 class="m-0 mt-1 text-lg font-semibold text-gray-900">
+              {{ visita.clienteNombre }}
+            </h2>
+            <p class="m-0 mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+              <span>{{ visita.horaPlanificada || 'Sin hora' }}</span>
+              <span
+                class="inline-flex rounded px-2 py-0.5 text-[11px] font-semibold"
+                [class]="estatusClass(visita.estatus)"
+              >
+                {{ estatusLabel(visita.estatus) }}
+              </span>
+            </p>
+          </div>
+          <button
+            type="button"
+            class="rounded-md border border-gray-200 px-2.5 py-1 text-sm text-gray-600 hover:bg-gray-50"
+            (click)="closeDetalle()"
+          >
+            Cerrar
+          </button>
+        </div>
+
+        <div class="mt-4 grid gap-3">
+          @if (visita.notas?.trim()) {
+            <div class="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5">
+              <p class="m-0 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Observaciones
+              </p>
+              <p class="m-0 mt-1 whitespace-pre-wrap text-sm leading-relaxed text-gray-800">
+                {{ visita.notas }}
+              </p>
+            </div>
+          }
+
+          @if (visita.motivo?.trim()) {
+            <div class="rounded-lg border border-rose-100 bg-rose-50 px-3 py-2.5">
+              <p class="m-0 text-xs font-semibold uppercase tracking-wide text-rose-700">
+                Motivo de cancelación
+              </p>
+              <p class="m-0 mt-1 whitespace-pre-wrap text-sm leading-relaxed text-rose-900">
+                {{ visita.motivo }}
+              </p>
+            </div>
+          }
+
+          @if (isAdmin() && visita.estatus === 'visitada') {
+            <div class="rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2.5">
+              <p class="m-0 text-xs font-semibold uppercase tracking-wide text-brand-800">
+                Resultado de la visita
+              </p>
+              <dl class="m-0 mt-2 grid gap-2 text-sm text-gray-800">
+                <div class="flex flex-wrap items-baseline gap-x-2">
+                  <dt class="text-xs font-medium text-gray-500">¿Hicieron pedido?</dt>
+                  <dd class="m-0 font-medium">
+                    {{
+                      visita.hizoPedido === true
+                        ? 'Sí'
+                        : visita.hizoPedido === false
+                          ? 'No'
+                          : '—'
+                    }}
+                  </dd>
+                </div>
+                <div class="flex flex-wrap items-baseline gap-x-2">
+                  <dt class="text-xs font-medium text-gray-500">¿Promocionaron?</dt>
+                  <dd class="m-0 font-medium">
+                    {{
+                      visita.promociono === true
+                        ? 'Sí'
+                        : visita.promociono === false
+                          ? 'No'
+                          : '—'
+                    }}
+                  </dd>
+                </div>
+                @if (visita.promociono && visita.productosPromocion?.trim()) {
+                  <div>
+                    <dt class="text-xs font-medium text-gray-500">Productos</dt>
+                    <dd class="m-0 mt-1 whitespace-pre-wrap text-sm leading-relaxed text-gray-800">
+                      {{ visita.productosPromocion }}
+                    </dd>
+                  </div>
+                }
+              </dl>
+            </div>
+          }
+
+          @if (isAdmin() && (visita.estatus === 'visitada' || visita.estatus === 'cancelada')) {
+            <div
+              class="rounded-lg border px-3 py-2.5"
+              [class]="
+                visita.estatus === 'visitada'
+                  ? 'border-emerald-100 bg-emerald-50'
+                  : 'border-gray-200 bg-gray-50'
+              "
+            >
+              <p
+                class="m-0 text-xs font-semibold uppercase tracking-wide"
+                [class]="
+                  visita.estatus === 'visitada' ? 'text-emerald-700' : 'text-gray-500'
+                "
+              >
+                Registro
+              </p>
+              <dl class="m-0 mt-2 grid gap-2 text-sm text-gray-800">
+                <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <dt class="text-xs font-medium text-gray-500">Hora</dt>
+                  <dd class="m-0">{{ formatMomento(visita.visitadaAt) }}</dd>
+                </div>
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <dt class="text-xs font-medium text-gray-500">Desde</dt>
+                  <dd class="m-0">
+                    <span
+                      class="inline-flex rounded px-2 py-0.5 text-[11px] font-semibold"
+                      [class]="
+                        visita.origenRegistro === 'mobile'
+                          ? 'bg-sky-100 text-sky-800'
+                          : visita.origenRegistro === 'web'
+                            ? 'bg-violet-100 text-violet-800'
+                            : 'bg-gray-100 text-gray-600'
+                      "
+                    >
+                      {{ origenLabel(visita.origenRegistro) }}
+                    </span>
+                  </dd>
+                </div>
+              </dl>
+              @if (visita.notasVisita?.trim()) {
+                <p class="m-0 mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-800">
+                  {{ visita.notasVisita }}
+                </p>
+              }
+              @if (mapEmbedUrl(visita); as embed) {
+                <div class="mt-3 overflow-hidden rounded-lg border border-gray-200 bg-white">
+                  <iframe
+                    title="Ubicación de la visita"
+                    class="block h-48 w-full border-0"
+                    loading="lazy"
+                    referrerpolicy="no-referrer-when-downgrade"
+                    [src]="embed"
+                  ></iframe>
+                </div>
+                <p class="m-0 mt-2 text-xs text-gray-500">
+                  @if (visita.accuracy != null) {
+                    Precisión ±{{ accuracyLabel(visita.accuracy) }}
+                    ·
+                  }
+                  <a
+                    class="font-medium text-brand-700 hover:underline"
+                    [href]="mapsUrl(visita)!"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Abrir en Google Maps
+                  </a>
+                </p>
+              } @else {
+                <p class="m-0 mt-3 text-xs text-gray-500">
+                  Sin ubicación GPS (el dispositivo no la envió o no dio permiso).
+                </p>
+              }
+            </div>
+          }
+
+          @if (
+            !visita.notas?.trim() &&
+            !visita.motivo?.trim() &&
+            !(
+              isAdmin() &&
+              (visita.estatus === 'visitada' || visita.estatus === 'cancelada')
+            )
+          ) {
+            <p class="m-0 text-sm text-gray-500">Sin observaciones ni motivos registrados.</p>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (showPromoProductos()) {
+    <div
+      class="fixed inset-0 z-50 grid place-items-center bg-brand-900/45 p-4"
+      role="dialog"
+      aria-modal="true"
+      (click)="showPromoProductoSuggestions.set(false)"
+    >
+      <div
+        class="w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-xl"
+        (click)="$event.stopPropagation()"
+      >
+        <h2 class="m-0 text-lg font-semibold text-gray-900">
+          Productos promocionados
+        </h2>
+
+        <div class="relative mt-4 grid gap-1">
+          <input
+            type="text"
+            class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
+            placeholder="Código o nombre del producto…"
+            [ngModel]="promoProductoQuery()"
+            [ngModelOptions]="{ standalone: true }"
+            (ngModelChange)="onPromoProductoInput($event)"
+            (focus)="onPromoProductoInput(promoProductoQuery())"
+            autocomplete="off"
+          />
+          @if (showPromoProductoSuggestions() && promoProductoSuggestions().length > 0) {
+            <ul
+              class="absolute top-full z-10 m-0 mt-1 max-h-48 w-full list-none overflow-y-auto rounded-md border border-gray-200 bg-white p-0 shadow-lg"
+            >
+              @for (p of promoProductoSuggestions(); track p.codigo) {
+                <li>
+                  <button
+                    type="button"
+                    class="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-brand-50"
+                    (click)="addPromoProducto(p)"
+                  >
+                    <span class="shrink-0 font-mono text-xs text-brand-700">{{ p.codigo }}</span>
+                    <span class="text-gray-800">{{ p.nombre }}</span>
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+        </div>
+
+        @if (promoProductos().length === 0) {
+          <p class="m-0 mt-4 rounded-md border border-dashed border-gray-200 px-3 py-6 text-center text-sm text-gray-500">
+            Aún no hay productos seleccionados.
+          </p>
+        } @else {
+          <ul class="m-0 mt-4 grid list-none gap-2 p-0">
+            @for (p of promoProductos(); track p.codigo) {
+              <li
+                class="flex items-start justify-between gap-2 rounded-md border border-gray-200 px-3 py-2"
+              >
+                <div class="min-w-0">
+                  <div class="font-mono text-xs font-semibold text-brand-700">
+                    {{ p.codigo }}
+                  </div>
+                  <div class="text-sm text-gray-800">{{ p.nombre }}</div>
+                </div>
+                <button
+                  type="button"
+                  class="shrink-0 text-xs font-medium text-red-600 hover:underline"
+                  (click)="removePromoProducto(p.codigo)"
+                >
+                  Quitar
+                </button>
+              </li>
+            }
+          </ul>
+        }
+
+        <div class="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            class="rounded-md border border-gray-200 px-3.5 py-2 text-sm font-medium"
+            (click)="closePromoProductos()"
+          >
+            Volver
+          </button>
+          <button
+            type="button"
+            class="rounded-md bg-brand-700 px-3.5 py-2 text-sm font-medium text-white hover:bg-brand-800"
+            (click)="confirmPromoProductos()"
+          >
+            Continuar
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (showForm()) {
+    <div
+      class="fixed inset-0 z-50 grid place-items-center bg-brand-900/45 p-4"
+      role="dialog"
+      aria-modal="true"
+      (click)="showClienteSuggestions.set(false)"
+    >
+      <div
+        class="w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-xl"
+        (click)="$event.stopPropagation()"
+      >
+        <h2 class="m-0 text-lg font-semibold text-gray-900">
+          {{ editingId() === null ? 'Nueva visita' : 'Editar visita' }}
+        </h2>
+        <form class="mt-4 grid gap-3" [formGroup]="form" (ngSubmit)="submit()">
+          <div class="relative grid gap-1">
+            <span class="text-xs font-medium text-gray-600">Cliente</span>
+            <input
+              type="text"
+              class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
+              placeholder="Buscar por código o nombre…"
+              [ngModel]="clienteQuery()"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="onClienteInput($event)"
+              (focus)="onClienteInput(clienteQuery())"
+              autocomplete="off"
+            />
+            <input type="hidden" formControlName="clienteNombre" />
+            @if (showClienteSuggestions() && clienteSuggestions().length > 0) {
+              <ul
+                class="absolute top-full z-10 m-0 mt-1 max-h-48 w-full list-none overflow-y-auto rounded-md border border-gray-200 bg-white p-0 shadow-lg"
+              >
+                @for (c of clienteSuggestions(); track c.codigo) {
+                  <li>
+                    <button
+                      type="button"
+                      class="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-brand-50"
+                      (click)="selectCliente(c)"
+                    >
+                      <span class="shrink-0 font-mono text-xs text-brand-700">{{ c.codigo }}</span>
+                      <span class="text-gray-800">{{ c.nombre }}</span>
+                    </button>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <label class="grid gap-1">
+              <span class="text-xs font-medium text-gray-600">Fecha</span>
+              <input
+                type="date"
+                formControlName="fechaPlanificada"
+                class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
+              />
+            </label>
+            <label class="grid gap-1">
+              <span class="text-xs font-medium text-gray-600">Hora (opcional)</span>
+              <input
+                type="time"
+                formControlName="horaPlanificada"
+                class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
+              />
+            </label>
+          </div>
+          @if (isAdmin()) {
+            <label class="grid gap-1">
+              <span class="text-xs font-medium text-gray-600">Asignado a</span>
+              <select
+                formControlName="vendedorId"
+                class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
+              >
+                <option [ngValue]="0">Selecciona…</option>
+                @for (v of vendedores(); track v.id) {
+                  <option [ngValue]="v.id">
+                    {{ v.nombre }}{{ v.rol === 'admin' ? ' (admin)' : '' }}
+                  </option>
+                }
+              </select>
+            </label>
+          }
+          <label class="grid gap-1">
+            <span class="text-xs font-medium text-gray-600">Notas</span>
+            <textarea
+              formControlName="notas"
+              rows="2"
+              class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
+            ></textarea>
+          </label>
+          <div class="mt-2 flex justify-end gap-2">
+            <button
+              type="button"
+              class="rounded-md border border-gray-200 px-3.5 py-2 text-sm font-medium"
+              (click)="closeForm()"
+            >
+              Cerrar
+            </button>
+            <button
+              type="submit"
+              class="rounded-md bg-brand-700 px-3.5 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-65"
+              [disabled]="saving()"
+            >
+              {{ saving() ? 'Guardando…' : 'Guardar' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+</section>

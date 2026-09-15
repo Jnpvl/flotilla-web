@@ -2,11 +2,11 @@
   <header class="mb-5 flex flex-wrap items-start justify-between gap-4">
     <div>
       <h1 class="m-0 text-xl font-semibold text-gray-800">Usuarios</h1>
-      <p class="mt-1 text-sm text-gray-500">Administra cuentas de admin, auxiliar y chofer.</p>
+      <p class="mt-1 text-sm text-gray-500">Administra cuentas de todos los roles del panel.</p>
     </div>
     <button
       type="button"
-      class="rounded-md bg-blue-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-blue-700"
+      class="rounded-md bg-brand-700 px-3.5 py-2 text-sm font-medium text-white hover:bg-brand-800"
       (click)="openCreate()"
     >
       Nuevo usuario
@@ -22,7 +22,7 @@
       <p class="mb-4">Aún no hay usuarios registrados.</p>
       <button
         type="button"
-        class="rounded-md bg-blue-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        class="rounded-md bg-brand-700 px-3.5 py-2 text-sm font-medium text-white hover:bg-brand-800"
         (click)="openCreate()"
       >
         Crear el primero
@@ -30,7 +30,7 @@
     </div>
   } @else {
     <div class="overflow-x-auto rounded-lg border border-gray-200 bg-white">
-      <table class="w-full min-w-[640px] border-collapse text-sm md:min-w-0">
+      <table class="w-full min-w-[720px] border-collapse text-sm md:min-w-0">
         <thead class="hidden md:table-header-group">
           <tr>
             <th class="bg-gray-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -41,6 +41,9 @@
             </th>
             <th class="bg-gray-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
               Rol
+            </th>
+            <th class="bg-gray-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Agente Contpaq
             </th>
             <th
               class="bg-gray-50 px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500"
@@ -75,6 +78,18 @@
                 </span>
               </td>
               <td
+                class="flex justify-between gap-4 border-0 p-0 text-sm md:table-cell md:border-b md:border-gray-200 md:px-4 md:py-3"
+              >
+                <span class="text-xs font-semibold text-gray-500 md:hidden">Agente</span>
+                <span class="text-gray-600">
+                  {{
+                    usuario.rol === 'vendedor'
+                      ? agenteLabel(usuario.agenteContpaqId)
+                      : '—'
+                  }}
+                </span>
+              </td>
+              <td
                 class="flex justify-start gap-2 border-0 p-0 text-sm md:table-cell md:border-b md:border-gray-200 md:px-4 md:py-3 md:text-right"
               >
                 <span class="text-xs font-semibold text-gray-500 md:hidden">Acciones</span>
@@ -106,11 +121,9 @@
 @if (showForm()) {
   <div
     class="fixed inset-0 z-50 grid place-items-center bg-gray-900/45 p-4"
-    (click)="closeForm()"
   >
     <div
       class="w-full max-w-md rounded-lg border border-gray-200 bg-white shadow-lg"
-      (click)="$event.stopPropagation()"
       role="dialog"
       aria-modal="true"
     >
@@ -135,7 +148,7 @@
             type="text"
             formControlName="nombre"
             placeholder="Nombre completo"
-            class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 outline-none focus:border-blue-300 focus:ring-3 focus:ring-blue-600/15"
+            class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 outline-none focus:border-brand-600 focus:ring-3 focus:ring-brand-600/20"
           />
         </label>
 
@@ -146,7 +159,7 @@
             formControlName="username"
             autocomplete="username"
             placeholder="usuario.login"
-            class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 outline-none focus:border-blue-300 focus:ring-3 focus:ring-blue-600/15"
+            class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 outline-none focus:border-brand-600 focus:ring-3 focus:ring-brand-600/20"
           />
         </label>
 
@@ -159,7 +172,7 @@
             formControlName="password"
             autocomplete="new-password"
             [placeholder]="editingId() === null ? '••••••••' : 'Dejar vacío para no cambiar'"
-            class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 outline-none focus:border-blue-300 focus:ring-3 focus:ring-blue-600/15"
+            class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 outline-none focus:border-brand-600 focus:ring-3 focus:ring-brand-600/20"
           />
         </label>
 
@@ -167,13 +180,33 @@
           <span class="text-xs font-medium text-gray-600">Rol</span>
           <select
             formControlName="rol"
-            class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 outline-none focus:border-blue-300 focus:ring-3 focus:ring-blue-600/15"
+            class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 outline-none focus:border-brand-600 focus:ring-3 focus:ring-brand-600/20"
           >
             @for (rol of roles; track rol) {
               <option [value]="rol">{{ rolLabel(rol) }}</option>
             }
           </select>
         </label>
+
+        @if (form.controls.rol.value === 'vendedor') {
+          <label class="grid gap-1">
+            <span class="text-xs font-medium text-gray-600">Agente Contpaq</span>
+            <select
+              formControlName="agenteContpaqId"
+              class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 outline-none focus:border-brand-600 focus:ring-3 focus:ring-brand-600/20"
+            >
+              <option [ngValue]="null">Selecciona un agente…</option>
+              @for (agente of agentes(); track agente.id) {
+                <option [ngValue]="agente.id">
+                  {{ agente.codigo }} — {{ agente.nombre }}
+                </option>
+              }
+            </select>
+            <span class="text-[11px] text-gray-500">
+              Solo verá clientes con este agente en PROMAC (`CIDAGENTEVENTA`).
+            </span>
+          </label>
+        }
 
         <div class="mt-1 flex justify-end gap-2">
           <button
@@ -185,7 +218,7 @@
           </button>
           <button
             type="submit"
-            class="rounded-md bg-blue-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-65"
+            class="rounded-md bg-brand-700 px-3.5 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:cursor-wait disabled:opacity-65"
             [disabled]="saving()"
           >
             {{ saving() ? 'Guardando…' : 'Guardar' }}

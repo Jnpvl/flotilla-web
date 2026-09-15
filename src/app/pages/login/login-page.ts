@@ -3,6 +3,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
+import { defaultHomePath } from '../../utils/roles';
 
 @Component({
   selector: 'app-login-page',
@@ -34,9 +35,9 @@ export class LoginPage {
     const { username, password } = this.form.getRawValue();
 
     this.auth.login(username.trim(), password).subscribe({
-      next: () => {
+      next: (response) => {
         this.loading.set(false);
-        void this.router.navigateByUrl('/');
+        void this.router.navigateByUrl(defaultHomePath(response.user.rol));
       },
       error: (err: unknown) => {
         this.loading.set(false);

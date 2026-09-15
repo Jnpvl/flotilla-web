@@ -3,12 +3,12 @@
     <div>
       <h1 class="m-0 text-xl font-semibold text-gray-800">Pedidos</h1>
       <p class="mt-1 text-sm text-gray-500">
-        Alta de lugares de entrega. El auxiliar solo registra el destino.
+        Alta de entregas desde el catálogo de clientes. El estatus solo lo cambia el admin.
       </p>
     </div>
     <button
       type="button"
-      class="rounded-md bg-blue-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-blue-700"
+      class="rounded-md bg-brand-700 px-3.5 py-2 text-sm font-medium text-white hover:bg-brand-800"
       (click)="openCreate()"
     >
       Nuevo pedido
@@ -20,7 +20,7 @@
       <span class="text-xs font-medium text-gray-600">Buscar lugar</span>
       <input
         type="search"
-        class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-600/15"
+        class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
         placeholder="Ej. Bodega Norte…"
         [ngModel]="searchQ()"
         [ngModelOptions]="{ standalone: true }"
@@ -30,7 +30,7 @@
     <label class="grid gap-1">
       <span class="text-xs font-medium text-gray-600">Filtrar estatus</span>
       <select
-        class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-600/15"
+        class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
         [ngModel]="filterEstatus()"
         [ngModelOptions]="{ standalone: true }"
         (ngModelChange)="onFilterEstatus($event)"
@@ -59,7 +59,7 @@
       @if (!searchQ() && !filterEstatus()) {
         <button
           type="button"
-          class="rounded-md bg-blue-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          class="rounded-md bg-brand-700 px-3.5 py-2 text-sm font-medium text-white hover:bg-brand-800"
           (click)="openCreate()"
         >
           Crear el primero
@@ -108,16 +108,9 @@
                 class="flex justify-between gap-4 border-0 p-0 text-sm md:table-cell md:border-b md:border-gray-200 md:px-4 md:py-3"
               >
                 <span class="text-xs font-semibold text-gray-500 md:hidden">Estatus</span>
-                @if (isEntregado(pedido)) {
-                  <span
-                    class="inline-block rounded-md px-2 py-1 text-xs font-semibold"
-                    [class]="estatusClass(pedido.estatus)"
-                  >
-                    {{ estatusLabel(pedido.estatus) }}
-                  </span>
-                } @else {
+                @if (canChangeEstatus(pedido)) {
                   <select
-                    class="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs font-semibold outline-none focus:border-blue-300"
+                    class="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs font-semibold outline-none focus:border-brand-600"
                     [class]="estatusClass(pedido.estatus)"
                     [ngModel]="pedido.estatus"
                     [ngModelOptions]="{ standalone: true }"
@@ -127,6 +120,13 @@
                       <option [ngValue]="estatus">{{ estatusLabel(estatus) }}</option>
                     }
                   </select>
+                } @else {
+                  <span
+                    class="inline-block rounded-md px-2 py-1 text-xs font-semibold"
+                    [class]="estatusClass(pedido.estatus)"
+                  >
+                    {{ estatusLabel(pedido.estatus) }}
+                  </span>
                 }
               </td>
               <td
@@ -136,7 +136,7 @@
                 @if (pedido.rutaId) {
                   <a
                     [routerLink]="['/rutas', pedido.rutaId]"
-                    class="font-medium text-blue-600 no-underline hover:underline"
+                    class="font-medium text-brand-700 no-underline hover:underline"
                   >
                     Ver ruta #{{ pedido.rutaId }}
                   </a>
@@ -161,9 +161,7 @@
               >
                 <span class="text-xs font-semibold text-gray-500 md:hidden">Acciones</span>
                 <div class="flex gap-2 md:justify-end">
-                  @if (isEntregado(pedido)) {
-                    <span class="text-xs text-gray-400">Cerrado</span>
-                  } @else {
+                  @if (canEditOrRemove(pedido)) {
                     <button
                       type="button"
                       class="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -178,6 +176,10 @@
                     >
                       Eliminar
                     </button>
+                  } @else if (isEntregado(pedido)) {
+                    <span class="text-xs text-gray-400">Cerrado</span>
+                  } @else {
+                    <span class="text-xs text-gray-400">En proceso</span>
                   }
                 </div>
               </td>
@@ -217,11 +219,9 @@
 @if (showForm()) {
   <div
     class="fixed inset-0 z-50 grid place-items-center bg-gray-900/45 p-4"
-    (click)="closeForm()"
   >
     <div
       class="w-full max-w-md rounded-lg border border-gray-200 bg-white shadow-lg"
-      (click)="$event.stopPropagation()"
       role="dialog"
       aria-modal="true"
     >
@@ -240,15 +240,43 @@
       </header>
 
       <form class="grid gap-3.5 p-4" [formGroup]="form" (ngSubmit)="submit()">
-        <label class="grid gap-1">
-          <span class="text-xs font-medium text-gray-600">Lugar de entrega</span>
+        <div class="relative grid gap-1">
+          <span class="text-xs font-medium text-gray-600">Cliente</span>
           <input
             type="text"
-            formControlName="lugarEntrega"
-            placeholder="Ej. Bodega Norte, Cliente XYZ…"
-            class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-600/15"
+            class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
+            placeholder="Buscar por código o nombre…"
+            [ngModel]="clienteQuery()"
+            [ngModelOptions]="{ standalone: true }"
+            (ngModelChange)="onClienteInput($event)"
+            (focus)="onClienteInput(clienteQuery())"
+            autocomplete="off"
           />
-        </label>
+          <input type="hidden" formControlName="lugarEntrega" />
+          @if (showClienteSuggestions() && clienteSuggestions().length > 0) {
+            <ul
+              class="absolute top-full z-10 m-0 mt-1 max-h-48 w-full list-none overflow-y-auto rounded-md border border-gray-200 bg-white p-0 shadow-lg"
+            >
+              @for (c of clienteSuggestions(); track c.codigo) {
+                <li>
+                  <button
+                    type="button"
+                    class="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-brand-50"
+                    (click)="selectCliente(c)"
+                  >
+                    <span class="shrink-0 font-mono text-xs text-brand-700">{{ c.codigo }}</span>
+                    <span class="text-gray-800">{{ c.nombre }}</span>
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+          @if (editingId() === null) {
+            <p class="m-0 text-xs text-gray-500">
+              Al guardar queda como listo para entregar.
+            </p>
+          }
+        </div>
 
         <div class="mt-1 flex justify-end gap-2">
           <button
@@ -260,7 +288,7 @@
           </button>
           <button
             type="submit"
-            class="rounded-md bg-blue-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-65"
+            class="rounded-md bg-brand-700 px-3.5 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:cursor-wait disabled:opacity-65"
             [disabled]="saving()"
           >
             {{ saving() ? 'Guardando…' : 'Guardar' }}

@@ -1,8 +1,13 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AlertService } from '../../services/alert.service';
+import { AuthService } from '../../services/auth.service';
+import {
+  type CatalogItem,
+  CatalogoService,
+} from '../../services/catalogo.service';
 import {
   type Pedido,
   type PedidoEstatus,
@@ -17,6 +22,8 @@ import { formatWallClock } from '../../utils/local-datetime';
 })
 export class PedidosPage implements OnInit {
   private readonly pedidosApi = inject(PedidoService);
+  private readonly catalogo = inject(CatalogoService);
+  private readonly auth = inject(AuthService);
   private readonly alerts = inject(AlertService);
   private readonly fb = inject(FormBuilder);
 
@@ -32,6 +39,13 @@ export class PedidosPage implements OnInit {
   readonly totalPages = signal(1);
   readonly filterEstatus = signal<PedidoEstatus | ''>('');
   readonly searchQ = signal('');
+
+  readonly clienteQuery = signal('');
+  readonly clienteSuggestions = signal<CatalogItem[]>([]);
+  readonly showClienteSuggestions = signal(false);
+  private clienteSearchSeq = 0;
+
+  readonly isAdmin = computed(() => this.auth.user()?.rol === 'admin');
 
   readonly form = this.fb.nonNullable.group({
     lugarEntrega: ['', [Validators.required]],
@@ -102,22 +116,53 @@ export class PedidosPage implements OnInit {
   openCreate(): void {
     this.editingId.set(null);
     this.form.reset({ lugarEntrega: '' });
+    this.clienteQuery.set('');
+    this.clienteSuggestions.set([]);
+    this.showClienteSuggestions.set(false);
     this.showForm.set(true);
   }
 
   openEdit(pedido: Pedido): void {
-    if (this.isEntregado(pedido)) {
-      void this.alerts.error('No permitido', 'Un pedido entregado no se puede editar');
+    if (!this.canEditOrRemove(pedido)) {
+      void this.alerts.error(
+        'No permitido',
+        'Solo se pueden editar pedidos en listo para entregar',
+      );
       return;
     }
     this.editingId.set(pedido.id);
     this.form.reset({ lugarEntrega: pedido.lugarEntrega });
+    this.clienteQuery.set(pedido.lugarEntrega);
+    this.clienteSuggestions.set([]);
+    this.showClienteSuggestions.set(false);
     this.showForm.set(true);
   }
 
   closeForm(): void {
     this.showForm.set(false);
     this.editingId.set(null);
+    this.clienteQuery.set('');
+    this.clienteSuggestions.set([]);
+    this.showClienteSuggestions.set(false);
+  }
+
+  onClienteInput(value: string): void {
+    this.clienteQuery.set(value);
+    this.form.controls.lugarEntrega.setValue(value.trim());
+    this.showClienteSuggestions.set(true);
+    const seq = ++this.clienteSearchSeq;
+    // Sin agenteId: todos los clientes activos de Contpaq.
+    this.catalogo.searchClientes(value, 30).subscribe((items) => {
+      if (seq !== this.clienteSearchSeq) return;
+      this.clienteSuggestions.set(items);
+    });
+  }
+
+  selectCliente(cliente: CatalogItem): void {
+    const label = `${cliente.codigo} — ${cliente.nombre}`;
+    this.clienteQuery.set(label);
+    this.form.controls.lugarEntrega.setValue(label);
+    this.showClienteSuggestions.set(false);
   }
 
   submit(): void {
@@ -135,7 +180,10 @@ export class PedidosPage implements OnInit {
         next: async () => {
           this.saving.set(false);
           this.closeForm();
-          await this.alerts.success('Pedido creado', 'El lugar de entrega se registró correctamente');
+          await this.alerts.success(
+            'Pedido creado',
+            'Quedó como listo para entregar',
+          );
           this.page.set(1);
           this.load();
         },
@@ -162,8 +210,11 @@ export class PedidosPage implements OnInit {
   }
 
   async askRemove(pedido: Pedido): Promise<void> {
-    if (this.isEntregado(pedido)) {
-      void this.alerts.error('No permitido', 'Un pedido entregado no se puede eliminar');
+    if (!this.canEditOrRemove(pedido)) {
+      void this.alerts.error(
+        'No permitido',
+        'Solo se pueden eliminar pedidos en listo para entregar',
+      );
       return;
     }
     const confirmed = await this.alerts.confirm(
@@ -187,7 +238,27 @@ export class PedidosPage implements OnInit {
     return pedido.estatus === 'entregado';
   }
 
+  isListoParaEntregar(pedido: Pedido): boolean {
+    return pedido.estatus === 'listo_para_entregar';
+  }
+
+  canEditOrRemove(pedido: Pedido): boolean {
+    return this.isListoParaEntregar(pedido);
+  }
+
+  canChangeEstatus(pedido: Pedido): boolean {
+    return this.isAdmin() && !this.isEntregado(pedido);
+  }
+
   async changeEstatus(pedido: Pedido, estatus: PedidoEstatus): Promise<void> {
+    if (!this.isAdmin()) {
+      void this.alerts.error(
+        'No permitido',
+        'Solo el administrador puede cambiar el estatus desde el panel',
+      );
+      this.load();
+      return;
+    }
     if (pedido.estatus === estatus) return;
     if (this.isEntregado(pedido)) {
       void this.alerts.error(
@@ -231,7 +302,7 @@ export class PedidosPage implements OnInit {
 
   estatusClass(estatus: PedidoEstatus): string {
     const classes: Record<PedidoEstatus, string> = {
-      listo_para_entregar: 'bg-blue-50 text-blue-700',
+      listo_para_entregar: 'bg-brand-50 text-brand-700',
       cargado: 'bg-violet-50 text-violet-700',
       en_ruta: 'bg-amber-50 text-amber-700',
       entregado: 'bg-green-50 text-green-700',
@@ -248,6 +319,7 @@ export class PedidosPage implements OnInit {
       if (typeof err.error?.message === 'string') return err.error.message;
       if (err.status === 0) return 'No hay conexión con el servidor';
       if (err.status === 401) return 'Sesión expirada. Vuelve a iniciar sesión';
+      if (err.status === 403) return err.error?.message ?? 'No tienes permiso para esta acción';
     }
     return fallback;
   }

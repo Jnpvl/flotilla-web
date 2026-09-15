@@ -19,7 +19,7 @@ export type RutaGpsPoint = {
   lng: number;
   recordedAt: string;
   speed: number | null;
-  tipo: 'tracking' | 'inicio_ruta' | 'pedido_entregado' | 'regreso_almacen' | string;
+  tipo: 'inicio_ruta' | 'pedido_entregado' | 'regreso_almacen' | string;
   pedidoId: number | null;
   label: string | null;
 };

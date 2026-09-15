@@ -1,10 +1,8 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { AlertService } from '../../services/alert.service';
-import { type Pedido, PedidoService } from '../../services/pedido.service';
-import { type Usuario, UsuarioService } from '../../services/usuario.service';
 import {
   type Ruta,
   type RutaEstatus,
@@ -19,26 +17,16 @@ import { formatRutaTitle, todayLocalDay } from '../../utils/local-datetime';
 })
 export class RutasPage implements OnInit {
   private readonly rutasApi = inject(RutaService);
-  private readonly pedidosApi = inject(PedidoService);
-  private readonly usuariosApi = inject(UsuarioService);
   private readonly alerts = inject(AlertService);
-  private readonly router = inject(Router);
 
   readonly rutas = signal<Ruta[]>([]);
   readonly loading = signal(true);
-  readonly showIniciar = signal(false);
-  readonly saving = signal(false);
 
   readonly page = signal(1);
   readonly pageSize = signal(10);
   readonly total = signal(0);
   readonly totalPages = signal(1);
   readonly filterFecha = signal('');
-
-  readonly choferes = signal<Usuario[]>([]);
-  readonly pedidosDisponibles = signal<Pedido[]>([]);
-  readonly selectedChoferId = signal<number | null>(null);
-  readonly selectedPedidoIds = signal<number[]>([]);
 
   ngOnInit(): void {
     this.load();
@@ -97,83 +85,6 @@ export class RutasPage implements OnInit {
 
   rutaTitle(ruta: Ruta): string {
     return formatRutaTitle(ruta.iniciadaAt, ruta.createdAt);
-  }
-
-  openIniciar(): void {
-    this.selectedChoferId.set(null);
-    this.selectedPedidoIds.set([]);
-    this.showIniciar.set(true);
-    this.saving.set(false);
-
-    this.usuariosApi.list().subscribe({
-      next: (users) => this.choferes.set(users.filter((u) => u.rol === 'chofer')),
-      error: (err: unknown) =>
-        void this.alerts.error('Error', this.errorMessage(err, 'No se pudieron cargar choferes')),
-    });
-
-    this.pedidosApi.list({ page: 1, pageSize: 100 }).subscribe({
-      next: (result) =>
-        this.pedidosDisponibles.set(
-          result.items.filter(
-            (p) => p.estatus === 'listo_para_entregar' || p.estatus === 'cargado',
-          ),
-        ),
-      error: (err: unknown) =>
-        void this.alerts.error('Error', this.errorMessage(err, 'No se pudieron cargar pedidos')),
-    });
-  }
-
-  closeIniciar(): void {
-    this.showIniciar.set(false);
-  }
-
-  onChoferChange(value: number | string | null): void {
-    if (value === null || value === '') {
-      this.selectedChoferId.set(null);
-      return;
-    }
-    this.selectedChoferId.set(Number(value));
-  }
-
-  togglePedido(id: number, checked: boolean): void {
-    const current = this.selectedPedidoIds();
-    if (checked) {
-      this.selectedPedidoIds.set([...current, id]);
-    } else {
-      this.selectedPedidoIds.set(current.filter((x) => x !== id));
-    }
-  }
-
-  isPedidoSelected(id: number): boolean {
-    return this.selectedPedidoIds().includes(id);
-  }
-
-  iniciarRuta(): void {
-    const choferId = this.selectedChoferId();
-    const pedidoIds = this.selectedPedidoIds();
-
-    if (!choferId) {
-      void this.alerts.error('Falta chofer', 'Selecciona un chofer para iniciar la ruta');
-      return;
-    }
-    if (pedidoIds.length === 0) {
-      void this.alerts.error('Faltan pedidos', 'Selecciona al menos un pedido listo para entregar');
-      return;
-    }
-
-    this.saving.set(true);
-    this.rutasApi.iniciar({ choferId, pedidoIds }).subscribe({
-      next: async (ruta) => {
-        this.saving.set(false);
-        this.closeIniciar();
-        await this.alerts.success('Ruta iniciada', 'Los pedidos pasaron a estatus en ruta');
-        void this.router.navigate(['/rutas', ruta.id]);
-      },
-      error: (err: unknown) => {
-        this.saving.set(false);
-        void this.alerts.error('No se pudo iniciar', this.errorMessage(err));
-      },
-    });
   }
 
   estatusLabel(estatus: RutaEstatus): string {

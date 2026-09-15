@@ -66,6 +66,8 @@ export class RutaDetallePage implements OnInit, OnDestroy {
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private rutaId = 0;
   private pedidoColorById = new Map<number, string>();
+  private markersById = new Map<number, L.CircleMarker>();
+  readonly selectedEventId = signal<number | null>(null);
 
   ngOnInit(): void {
     this.rutaId = Number(this.route.snapshot.paramMap.get('id'));
@@ -148,7 +150,7 @@ export class RutaDetallePage implements OnInit, OnDestroy {
       case 'regreso_almacen':
         return 'Regreso al almacén';
       default:
-        return 'GPS tracking';
+        return 'Evento';
     }
   }
 
@@ -166,11 +168,31 @@ export class RutaDetallePage implements OnInit, OnDestroy {
   }
 
   eventos(ruta: Ruta): RutaGpsPoint[] {
-    return this.sortedGps(ruta.gps ?? []).filter((p) => p.tipo !== 'tracking');
+    return this.sortedGps(ruta.gps ?? []);
   }
 
-  trackingCount(ruta: Ruta): number {
-    return (ruta.gps ?? []).filter((p) => (p.tipo || 'tracking') === 'tracking').length;
+  focusEvent(point: RutaGpsPoint): void {
+    if (!Number.isFinite(point.lat) || !Number.isFinite(point.lng)) return;
+
+    this.selectedEventId.set(point.id);
+    this.mapEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    if (!this.map) {
+      const ruta = this.ruta();
+      if (ruta) this.drawMap(ruta);
+    }
+    if (!this.map) return;
+
+    const ll = L.latLng(point.lat, point.lng);
+    this.map.flyTo(ll, Math.max(this.map.getZoom(), 16), {
+      animate: true,
+      duration: 0.6,
+    });
+
+    const marker = this.markersById.get(point.id);
+    if (marker) {
+      marker.openPopup();
+    }
   }
 
   leyendaPedidos(ruta: Ruta): { pedidoId: number; lugar: string; color: string }[] {
@@ -179,44 +201,6 @@ export class RutaDetallePage implements OnInit, OnDestroy {
       lugar: p.lugarEntrega,
       color: this.colorForPedido(p.pedidoId),
     }));
-  }
-
-  async askFinalizar(): Promise<void> {
-    const ruta = this.ruta();
-    if (!ruta) return;
-
-    const confirmed = await this.alerts.confirm(
-      '¿Finalizar ruta?',
-      'Se marcará el regreso a bodega. Todos los pedidos deben estar entregados.',
-    );
-    if (!confirmed) return;
-
-    const kmRaw = window.prompt(
-      'Kilómetros recorridos (deja 0 o vacío para calcularlos desde el GPS):',
-      '0',
-    );
-    const kmRecorridos =
-      kmRaw === null || kmRaw.trim() === ''
-        ? undefined
-        : Number(kmRaw.replace(',', '.'));
-
-    if (
-      kmRecorridos !== undefined &&
-      (!Number.isFinite(kmRecorridos) || kmRecorridos < 0)
-    ) {
-      void this.alerts.error('Dato inválido', 'Los kilómetros deben ser un número ≥ 0');
-      return;
-    }
-
-    this.rutasApi.finalizar(ruta.id, { kmRecorridos }).subscribe({
-      next: async () => {
-        await this.alerts.success('Ruta finalizada');
-        this.load(false);
-      },
-      error: (err: unknown) => {
-        void this.alerts.error('No se pudo finalizar', this.errorMessage(err));
-      },
-    });
   }
 
   private load(initial: boolean): void {
@@ -272,7 +256,8 @@ export class RutaDetallePage implements OnInit, OnDestroy {
   private drawMap(ruta: Ruta): void {
     if (!this.mapEl) return;
 
-    const points = this.sortedGps(ruta.gps ?? []);
+    // Solo puntos de estatus (inicio / entregas / regreso).
+    const points = this.eventos(ruta);
 
     if (!this.map) {
       this.map = L.map(this.mapEl, {
@@ -287,6 +272,7 @@ export class RutaDetallePage implements OnInit, OnDestroy {
     }
 
     this.overlay.clearLayers();
+    this.markersById.clear();
 
     if (points.length === 0) {
       this.map.setView([19.4326, -99.1332], 12);
@@ -296,37 +282,15 @@ export class RutaDetallePage implements OnInit, OnDestroy {
 
     const latLngs = points.map((p) => L.latLng(p.lat, p.lng));
 
-    // Línea continua del recorrido (todos los puntos en orden)
-    L.polyline(latLngs, {
-      color: '#1e40af',
-      weight: 4,
-      opacity: 0.75,
-      lineJoin: 'round',
-      lineCap: 'round',
-    }).addTo(this.overlay);
-
     for (const point of points) {
       const ll = L.latLng(point.lat, point.lng);
-      const tipo = point.tipo || 'tracking';
+      const tipo = point.tipo || 'inicio_ruta';
       const color = this.eventColor(point);
       const hora = this.formatDate(point.recordedAt);
       const titulo = this.eventLabel(point);
-
-      if (tipo === 'tracking') {
-        L.circleMarker(ll, {
-          radius: 3,
-          color: '#93c5fd',
-          fillColor: '#3b82f6',
-          fillOpacity: 0.85,
-          weight: 1,
-        })
-          .bindPopup(`<strong>GPS tracking</strong><br>${hora}`)
-          .addTo(this.overlay);
-        continue;
-      }
-
       const radius = tipo === 'pedido_entregado' ? 9 : 8;
-      L.circleMarker(ll, {
+
+      const marker = L.circleMarker(ll, {
         radius,
         color: '#fff',
         fillColor: color,
@@ -335,21 +299,40 @@ export class RutaDetallePage implements OnInit, OnDestroy {
       })
         .bindPopup(`<strong>${titulo}</strong><br>${hora}`)
         .addTo(this.overlay);
+
+      this.markersById.set(point.id, marker);
     }
 
-    const bounds = L.latLngBounds(latLngs);
-    this.map.fitBounds(bounds.pad(0.15));
+    const selectedId = this.selectedEventId();
+    const selected = selectedId != null ? this.markersById.get(selectedId) : null;
+    if (selected) {
+      const ll = selected.getLatLng();
+      this.map.setView(ll, Math.max(this.map.getZoom(), 16));
+      selected.openPopup();
+    } else {
+      const bounds = L.latLngBounds(latLngs);
+      this.map.fitBounds(bounds.pad(0.15));
+    }
     setTimeout(() => this.map?.invalidateSize(), 80);
   }
 
   private sortedGps(points: RutaGpsPoint[]): RutaGpsPoint[] {
+    const eventTipos = new Set([
+      'inicio_ruta',
+      'pedido_entregado',
+      'regreso_almacen',
+    ]);
     return [...points]
-      .filter((p) => Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng)))
+      .filter(
+        (p) =>
+          eventTipos.has(p.tipo) &&
+          Number.isFinite(Number(p.lat)) &&
+          Number.isFinite(Number(p.lng)),
+      )
       .map((p) => ({
         ...p,
         lat: Number(p.lat),
         lng: Number(p.lng),
-        tipo: p.tipo || 'tracking',
         pedidoId: p.pedidoId ?? null,
         label: p.label ?? null,
       }))

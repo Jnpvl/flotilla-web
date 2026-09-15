@@ -2,13 +2,14 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiClient } from './api-client';
 
-export type RolUsuario = 'admin' | 'auxiliar' | 'chofer';
+export type RolUsuario = 'admin' | 'auxiliar' | 'chofer' | 'vendedor' | 'facturista';
 
 export type Usuario = {
   id: number;
   nombre: string;
   username: string;
   rol: RolUsuario;
+  agenteContpaqId: number | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -18,6 +19,7 @@ export type CreateUsuarioPayload = {
   username: string;
   password: string;
   rol: RolUsuario;
+  agenteContpaqId?: number | null;
 };
 
 export type UpdateUsuarioPayload = {
@@ -25,6 +27,7 @@ export type UpdateUsuarioPayload = {
   username?: string;
   password?: string;
   rol?: RolUsuario;
+  agenteContpaqId?: number | null;
 };
 
 @Injectable({ providedIn: 'root' })

@@ -2,6 +2,13 @@
 
 @theme {
   --font-sans: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --color-brand-50: #e8f4f7;
+  --color-brand-100: #c5e4eb;
+  --color-brand-200: #9fd0db;
+  --color-brand-600: #007a92;
+  --color-brand-700: #005f71;
+  --color-brand-800: #004a59;
+  --color-brand-900: #003844;
 }
 
 html,
@@ -10,7 +17,7 @@ body {
 }
 
 body {
-  @apply bg-gray-100 text-sm text-gray-800 antialiased;
+  @apply bg-brand-50/40 text-sm text-gray-800 antialiased;
   font-family: var(--font-sans);
 }
 

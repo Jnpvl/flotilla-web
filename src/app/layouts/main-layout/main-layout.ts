@@ -1,8 +1,15 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
+import {
+  canAccessFlotilla,
+  canAccessInicio,
+  canAccessUsuarios,
+  canAccessVentas,
+  canAccessVisitas,
+} from '../../utils/roles';
 
 @Component({
   selector: 'app-main-layout',
@@ -14,6 +21,12 @@ export class MainLayout {
   private readonly router = inject(Router);
 
   readonly sidebarOpen = signal(false);
+
+  readonly showInicio = computed(() => canAccessInicio(this.auth.user()?.rol));
+  readonly showFlotilla = computed(() => canAccessFlotilla(this.auth.user()?.rol));
+  readonly showVentas = computed(() => canAccessVentas(this.auth.user()?.rol));
+  readonly showVisitas = computed(() => canAccessVisitas(this.auth.user()?.rol));
+  readonly showUsuarios = computed(() => canAccessUsuarios(this.auth.user()?.rol));
 
   constructor() {
     this.router.events

@@ -3,6 +3,10 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AlertService } from '../../services/alert.service';
 import {
+  type CatalogAgente,
+  CatalogoService,
+} from '../../services/catalogo.service';
+import {
   type RolUsuario,
   type Usuario,
   UsuarioService,
@@ -15,26 +19,38 @@ import {
 })
 export class UsuariosPage implements OnInit {
   private readonly usuariosApi = inject(UsuarioService);
+  private readonly catalogo = inject(CatalogoService);
   private readonly alerts = inject(AlertService);
   private readonly fb = inject(FormBuilder);
 
   readonly usuarios = signal<Usuario[]>([]);
+  readonly agentes = signal<CatalogAgente[]>([]);
   readonly loading = signal(true);
   readonly saving = signal(false);
   readonly showForm = signal(false);
   readonly editingId = signal<number | null>(null);
 
-  readonly roles: RolUsuario[] = ['admin', 'auxiliar', 'chofer'];
+  readonly roles: RolUsuario[] = ['admin', 'auxiliar', 'chofer', 'vendedor', 'facturista'];
 
   readonly form = this.fb.nonNullable.group({
     nombre: ['', [Validators.required]],
     username: ['', [Validators.required]],
     password: ['', [Validators.required]],
     rol: ['auxiliar' as RolUsuario, [Validators.required]],
+    agenteContpaqId: [null as number | null],
   });
 
   ngOnInit(): void {
     this.load();
+    this.catalogo.listAgentes().subscribe({
+      next: (items) => this.agentes.set(items),
+      error: () => this.agentes.set([]),
+    });
+    this.form.controls.rol.valueChanges.subscribe((rol) => {
+      if (rol !== 'vendedor') {
+        this.form.controls.agenteContpaqId.setValue(null);
+      }
+    });
   }
 
   load(): void {
@@ -58,6 +74,7 @@ export class UsuariosPage implements OnInit {
       username: '',
       password: '',
       rol: 'auxiliar',
+      agenteContpaqId: null,
     });
     this.form.controls.password.setValidators([Validators.required]);
     this.form.controls.password.updateValueAndValidity();
@@ -71,6 +88,7 @@ export class UsuariosPage implements OnInit {
       username: usuario.username,
       password: '',
       rol: usuario.rol,
+      agenteContpaqId: usuario.agenteContpaqId,
     });
     this.form.controls.password.clearValidators();
     this.form.controls.password.updateValueAndValidity();
@@ -89,22 +107,41 @@ export class UsuariosPage implements OnInit {
     }
 
     const value = this.form.getRawValue();
+    if (value.rol === 'vendedor' && (!value.agenteContpaqId || value.agenteContpaqId <= 0)) {
+      void this.alerts.error(
+        'Falta agente',
+        'Selecciona el agente Contpaq para este vendedor',
+      );
+      return;
+    }
+
     const editingId = this.editingId();
     this.saving.set(true);
 
+    const agenteContpaqId =
+      value.rol === 'vendedor' ? value.agenteContpaqId : null;
+
     if (editingId === null) {
-      this.usuariosApi.create(value).subscribe({
-        next: async () => {
-          this.saving.set(false);
-          this.closeForm();
-          await this.alerts.success('Usuario creado', 'El usuario se dio de alta correctamente');
-          this.load();
-        },
-        error: (err: unknown) => {
-          this.saving.set(false);
-          void this.alerts.error('No se pudo crear', this.errorMessage(err));
-        },
-      });
+      this.usuariosApi
+        .create({
+          nombre: value.nombre,
+          username: value.username,
+          password: value.password,
+          rol: value.rol,
+          agenteContpaqId,
+        })
+        .subscribe({
+          next: async () => {
+            this.saving.set(false);
+            this.closeForm();
+            await this.alerts.success('Usuario creado', 'El usuario se dio de alta correctamente');
+            this.load();
+          },
+          error: (err: unknown) => {
+            this.saving.set(false);
+            void this.alerts.error('No se pudo crear', this.errorMessage(err));
+          },
+        });
       return;
     }
 
@@ -112,6 +149,7 @@ export class UsuariosPage implements OnInit {
       nombre: value.nombre,
       username: value.username,
       rol: value.rol,
+      agenteContpaqId,
       ...(value.password ? { password: value.password } : {}),
     };
 
@@ -147,11 +185,19 @@ export class UsuariosPage implements OnInit {
     });
   }
 
+  agenteLabel(id: number | null): string {
+    if (id == null) return '—';
+    const agente = this.agentes().find((a) => a.id === id);
+    return agente ? `${agente.codigo} — ${agente.nombre}` : `#${id}`;
+  }
+
   rolLabel(rol: RolUsuario): string {
     const labels: Record<RolUsuario, string> = {
       admin: 'Admin',
       auxiliar: 'Auxiliar',
       chofer: 'Chofer',
+      vendedor: 'Vendedor',
+      facturista: 'Facturista',
     };
     return labels[rol];
   }
@@ -159,8 +205,10 @@ export class UsuariosPage implements OnInit {
   rolClass(rol: RolUsuario): string {
     const classes: Record<RolUsuario, string> = {
       admin: 'bg-gray-100 text-gray-700',
-      auxiliar: 'bg-blue-50 text-blue-700',
+      auxiliar: 'bg-brand-50 text-brand-700',
       chofer: 'bg-orange-50 text-orange-700',
+      vendedor: 'bg-violet-50 text-violet-700',
+      facturista: 'bg-emerald-50 text-emerald-800',
     };
     return classes[rol];
   }
