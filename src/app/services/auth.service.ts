@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, catchError, finalize, map, of, tap } from 'rxjs';
@@ -48,7 +49,8 @@ export class AuthService {
 
   /**
    * Confirma contra la API que el token y el usuario siguen siendo válidos.
-   * Si no, limpia la sesión local.
+   * Solo limpia la sesión local ante 401 (token/usuario inválidos).
+   * Errores de red o 5xx mantienen la sesión cacheada para no botar al refrescar.
    */
   ensureSession(): Observable<boolean> {
     if (!this.tokenSignal()) {
@@ -69,8 +71,15 @@ export class AuthService {
         this.sessionValidated = true;
       }),
       map(() => true),
-      catchError(() => {
-        this.clearLocalSession();
+      catchError((err: unknown) => {
+        if (err instanceof HttpErrorResponse && err.status === 401) {
+          this.clearLocalSession();
+          return of(false);
+        }
+        // Red / 5xx / CORS: conservar sesión local si hay usuario cacheado.
+        if (this.userSignal()) {
+          return of(true);
+        }
         return of(false);
       }),
       finalize(() => {

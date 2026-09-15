@@ -8,18 +8,20 @@ let handlingUnauthorized = false;
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const isLoginRequest = req.url.includes('/auth/login');
+  const isMeRequest = req.url.includes('/auth/me');
 
   return next(req).pipe(
     catchError((error: unknown) => {
+      // /auth/me lo maneja AuthService.ensureSession (evita doble logout al refrescar).
       if (
         !isLoginRequest &&
+        !isMeRequest &&
         error instanceof HttpErrorResponse &&
         error.status === 401
       ) {
         if (!handlingUnauthorized) {
           handlingUnauthorized = true;
           auth.logout();
-          // permite futuros 401 tras un nuevo login
           setTimeout(() => {
             handlingUnauthorized = false;
           }, 1000);
