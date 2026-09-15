@@ -440,6 +440,13 @@ export class PedidosComercialesPage implements OnInit {
     );
   }
 
+  canMarkFacturado(pedido: PedidoComercial): boolean {
+    return (
+      this.isPrefactura(pedido.estatus) &&
+      (this.isFacturista() || this.isAdmin())
+    );
+  }
+
   canDelete(pedido: PedidoComercial): boolean {
     if (this.isFacturista()) return false;
     if (pedido.estatus === 'facturado') return false;
