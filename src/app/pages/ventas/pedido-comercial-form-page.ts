@@ -47,6 +47,7 @@ export class PedidoComercialFormPage implements OnInit {
   readonly productoQuery = signal('');
   readonly productoSuggestions = signal<CatalogItem[]>([]);
   readonly showProductoSuggestions = signal(false);
+  readonly productoSeleccionado = signal<CatalogItem | null>(null);
   readonly lineas = signal<LineaPedidoComercial[]>([]);
   readonly cantidadNueva = signal(1);
   readonly precioNuevo = signal<number | null>(null);
@@ -201,6 +202,7 @@ export class PedidoComercialFormPage implements OnInit {
 
   onProductoInput(value: string): void {
     this.productoQuery.set(value);
+    this.productoSeleccionado.set(null);
     this.showProductoSuggestions.set(true);
     const seq = ++this.productoSearchSeq;
     this.catalogo.searchProductos(value).subscribe((items) => {
@@ -209,7 +211,22 @@ export class PedidoComercialFormPage implements OnInit {
     });
   }
 
-  addProducto(producto: CatalogItem): void {
+  selectProducto(producto: CatalogItem): void {
+    this.productoSeleccionado.set(producto);
+    this.productoQuery.set(producto.nombre);
+    this.productoSuggestions.set([]);
+    this.showProductoSuggestions.set(false);
+  }
+
+  addProducto(): void {
+    const producto = this.productoSeleccionado();
+    if (!producto) {
+      void this.alerts.error(
+        'Producto',
+        'Selecciona un producto del listado.',
+      );
+      return;
+    }
     const cantidad = Math.max(1, Math.floor(Number(this.cantidadNueva()) || 1));
     const precioRaw = this.precioNuevo();
     const precio =
@@ -251,6 +268,7 @@ export class PedidoComercialFormPage implements OnInit {
       ]);
     }
     this.productoQuery.set('');
+    this.productoSeleccionado.set(null);
     this.productoSuggestions.set([]);
     this.showProductoSuggestions.set(false);
     this.cantidadNueva.set(1);
