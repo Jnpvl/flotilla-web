@@ -158,7 +158,7 @@
                       Enviar a prefactura
                     </button>
                   }
-                  @if (isFacturista() && isPrefactura(pedido.estatus)) {
+                  @if (canMarkFacturado(pedido)) {
                     <button
                       type="button"
                       class="text-xs font-medium text-sky-700 hover:underline"
@@ -166,8 +166,6 @@
                     >
                       Avisar WhatsApp
                     </button>
-                  }
-                  @if (canMarkFacturado(pedido)) {
                     <button
                       type="button"
                       class="text-xs font-medium text-emerald-700 hover:underline"

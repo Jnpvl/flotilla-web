@@ -48,6 +48,10 @@ export class PedidosComercialesPage implements OnInit {
 
   readonly isAdmin = computed(() => this.auth.user()?.rol === 'admin');
   readonly isFacturista = computed(() => this.auth.user()?.rol === 'facturista');
+  /** Mismas operaciones de facturación: surtido, WhatsApp y marcar facturado. */
+  readonly canFacturarOps = computed(
+    () => this.isFacturista() || this.isAdmin(),
+  );
   readonly isVendedor = computed(() => this.auth.user()?.rol === 'vendedor');
   readonly canCreate = computed(() => {
     const rol = this.auth.user()?.rol;
@@ -155,7 +159,7 @@ export class PedidosComercialesPage implements OnInit {
   }
 
   canEditSurtido(pedido: PedidoComercial): boolean {
-    return this.isFacturista() && this.isPrefactura(pedido.estatus);
+    return this.canFacturarOps() && this.isPrefactura(pedido.estatus);
   }
 
   updateSurtido(pedidoId: number, codigo: string, value: number | string): void {
@@ -432,19 +436,14 @@ export class PedidosComercialesPage implements OnInit {
   }
 
   canSendPrefactura(pedido: PedidoComercial): boolean {
-    const can =
-      this.isFacturista() || this.isAdmin();
     return (
-      can &&
+      this.canFacturarOps() &&
       (pedido.estatus === 'borrador' || pedido.estatus === 'capturado')
     );
   }
 
   canMarkFacturado(pedido: PedidoComercial): boolean {
-    return (
-      this.isPrefactura(pedido.estatus) &&
-      (this.isFacturista() || this.isAdmin())
-    );
+    return this.canFacturarOps() && this.isPrefactura(pedido.estatus);
   }
 
   canDelete(pedido: PedidoComercial): boolean {
@@ -538,7 +537,7 @@ export class PedidosComercialesPage implements OnInit {
   }
 
   private ensureSurtidoDraft(pedido: PedidoComercial): void {
-    if (!this.isFacturista() || !this.isPrefactura(pedido.estatus)) return;
+    if (!this.canFacturarOps() || !this.isPrefactura(pedido.estatus)) return;
     this.surtidoDrafts.update((map) => {
       const next = new Map(map);
       next.set(pedido.id, this.cloneLineas(pedido));
