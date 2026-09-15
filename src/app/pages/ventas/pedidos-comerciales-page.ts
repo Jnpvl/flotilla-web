@@ -11,7 +11,9 @@ import {
 } from '../../services/pedido-comercial.service';
 import {
   type LineaPedidoComercial,
+  type LineaPedidoDiff,
   buildPedidoDetalle,
+  diffLineasPedido,
   mergeSurtidoOntoLineas,
   parsePedidoDetalle,
   productFingerprint,
@@ -39,6 +41,13 @@ export class PedidosComercialesPage implements OnInit {
   readonly expandedIds = signal<Set<number>>(new Set());
   /** Borrador de surtido por pedido (solo facturista en el listado). */
   readonly surtidoDrafts = signal<Map<number, LineaPedidoComercial[]>>(new Map());
+  /**
+   * Listado de productos conocido antes del cambio del vendedor.
+   * Sirve para resaltar altas/bajas/cambios de cant/precio.
+   */
+  readonly listadoBaselineById = signal(
+    new Map<number, LineaPedidoComercial[]>(),
+  );
   /**
    * Fingerprint del listado que ya se mostró al facturista tras un cambio.
    * El OK de la alerta solo deja ver productos; no guarda ni factura.
@@ -91,15 +100,26 @@ export class PedidosComercialesPage implements OnInit {
           this.page.set(data.page);
           this.totalPages.set(data.totalPages);
           this.loading.set(false);
-          // Refrescar drafts abiertos con datos frescos
+          // Refrescar drafts abiertos con datos frescos; si el listado cambió,
+          // conservar el anterior como baseline para resaltar diferencias.
           this.surtidoDrafts.update((map) => {
             const next = new Map(map);
             for (const id of next.keys()) {
               const pedido = data.items.find((p) => p.id === id);
               if (pedido && this.canEditSurtido(pedido)) {
-                next.set(id, this.cloneLineas(pedido));
+                const prevDraft = next.get(id) ?? [];
+                const freshLineas = this.cloneLineas(pedido);
+                if (
+                  prevDraft.length > 0 &&
+                  productFingerprint(prevDraft) !==
+                    productFingerprint(freshLineas)
+                ) {
+                  this.ensureListadoBaseline(id, prevDraft);
+                }
+                next.set(id, freshLineas);
               } else {
                 next.delete(id);
+                this.clearListadoBaseline(id);
               }
             }
             return next;
@@ -152,6 +172,55 @@ export class PedidosComercialesPage implements OnInit {
     const draft = this.surtidoDrafts().get(pedido.id);
     if (draft && this.canEditSurtido(pedido)) return draft;
     return parsePedidoDetalle(pedido.detalle).lineas;
+  }
+
+  /** Líneas con marcadores de cambio vs el listado previo del facturista. */
+  lineasDiffDe(pedido: PedidoComercial): LineaPedidoDiff[] {
+    const current = this.lineasDe(pedido);
+    const baseline = this.listadoBaselineById().get(pedido.id);
+    if (
+      !baseline ||
+      productFingerprint(baseline) === productFingerprint(current)
+    ) {
+      return current.map((linea) => ({
+        kind: 'same' as const,
+        codigo: linea.codigo,
+        linea,
+        cantidadChanged: false,
+        precioChanged: false,
+      }));
+    }
+    return diffLineasPedido(baseline, current);
+  }
+
+  hasListadoDiffs(pedido: PedidoComercial): boolean {
+    return this.lineasDiffDe(pedido).some((d) => d.kind !== 'same');
+  }
+
+  lineaDiffRowClass(diff: LineaPedidoDiff): string {
+    switch (diff.kind) {
+      case 'added':
+        return 'border-t border-emerald-200/80 bg-emerald-50/80';
+      case 'removed':
+        return 'border-t border-red-200/80 bg-red-50/70';
+      case 'changed':
+        return 'border-t border-amber-200/80 bg-amber-50/80';
+      default:
+        return 'border-t border-gray-200/80';
+    }
+  }
+
+  lineaDiffBadge(diff: LineaPedidoDiff): string | null {
+    if (diff.kind === 'added') return 'Agregado';
+    if (diff.kind === 'removed') return 'Eliminado';
+    if (diff.kind === 'changed') {
+      const parts: string[] = [];
+      if (diff.cantidadChanged) parts.push('Cantidad');
+      if (diff.precioChanged) parts.push('Precio');
+      if (parts.length === 0) parts.push('Modificado');
+      return parts.join(' · ');
+    }
+    return null;
   }
 
   notasDe(pedido: PedidoComercial): string {
@@ -224,6 +293,11 @@ export class PedidosComercialesPage implements OnInit {
       productFingerprint(draft) !== fp;
     const listadoCambio = fresh.requiereRevision || draftProductsDiffer;
 
+    if (draftProductsDiffer) {
+      // El borrador previo es la base para resaltar altas/bajas/cambios.
+      this.setListadoBaseline(fresh.id, draft);
+    }
+
     // Primero solo avisa y muestra productos; no guarda ni factura
     if (listadoCambio && !this.yaVioListado(fresh.id, fp)) {
       await this.alerts.info(
@@ -243,6 +317,7 @@ export class PedidosComercialesPage implements OnInit {
       .subscribe({
         next: async () => {
           this.savingSurtidoId.set(null);
+          this.setListadoBaseline(fresh.id, merged);
           await this.alerts.success('Cantidades surtidas guardadas');
           this.load();
         },
@@ -319,6 +394,10 @@ export class PedidosComercialesPage implements OnInit {
       draft.length > 0 && productFingerprint(draft) !== fp;
     const listadoCambio = fresh.requiereRevision || draftProductsDiffer;
 
+    if (draftProductsDiffer) {
+      this.setListadoBaseline(fresh.id, draft);
+    }
+
     // Con listado modificado: solo avisa, muestra productos y corta. No factura.
     if (listadoCambio) {
       await this.alerts.info(
@@ -369,6 +448,7 @@ export class PedidosComercialesPage implements OnInit {
       parsePedidoDetalle(latest.detalle).lineas,
     );
     if (latest.requiereRevision || latestFp !== fp) {
+      this.setListadoBaseline(fresh.id, merged);
       this.pedidos.update((list) =>
         list.map((p) => (p.id === latest.id ? latest : p)),
       );
@@ -584,9 +664,50 @@ export class PedidosComercialesPage implements OnInit {
 
   private ensureSurtidoDraft(pedido: PedidoComercial): void {
     if (!this.canFacturarOps() || !this.isPrefactura(pedido.estatus)) return;
+    const lineas = this.cloneLineas(pedido);
     this.surtidoDrafts.update((map) => {
       const next = new Map(map);
-      next.set(pedido.id, this.cloneLineas(pedido));
+      next.set(pedido.id, lineas);
+      return next;
+    });
+    // Baseline inicial: listado que el facturista ya vio (sin diffs).
+    this.ensureListadoBaseline(pedido.id, lineas);
+  }
+
+  private ensureListadoBaseline(
+    pedidoId: number,
+    lineas: LineaPedidoComercial[],
+  ): void {
+    this.listadoBaselineById.update((map) => {
+      if (map.has(pedidoId)) return map;
+      const next = new Map(map);
+      next.set(
+        pedidoId,
+        lineas.map((l) => ({ ...l })),
+      );
+      return next;
+    });
+  }
+
+  private setListadoBaseline(
+    pedidoId: number,
+    lineas: LineaPedidoComercial[],
+  ): void {
+    this.listadoBaselineById.update((map) => {
+      const next = new Map(map);
+      next.set(
+        pedidoId,
+        lineas.map((l) => ({ ...l })),
+      );
+      return next;
+    });
+  }
+
+  private clearListadoBaseline(pedidoId: number): void {
+    this.listadoBaselineById.update((map) => {
+      if (!map.has(pedidoId)) return map;
+      const next = new Map(map);
+      next.delete(pedidoId);
       return next;
     });
   }

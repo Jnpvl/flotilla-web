@@ -94,6 +94,69 @@ export function mergeSurtidoOntoLineas(
   }));
 }
 
+export type LineaDiffKind = 'same' | 'added' | 'removed' | 'changed';
+
+export type LineaPedidoDiff = {
+  kind: LineaDiffKind;
+  codigo: string;
+  /** Línea actual (o la previa si fue eliminada). */
+  linea: LineaPedidoComercial;
+  prev?: LineaPedidoComercial;
+  cantidadChanged: boolean;
+  precioChanged: boolean;
+};
+
+/** Compara listado anterior vs actual: altas, bajas y cambios de cant/precio. */
+export function diffLineasPedido(
+  prev: LineaPedidoComercial[],
+  next: LineaPedidoComercial[],
+): LineaPedidoDiff[] {
+  const prevByCode = new Map(prev.map((l) => [l.codigo, l]));
+  const nextByCode = new Map(next.map((l) => [l.codigo, l]));
+  const result: LineaPedidoDiff[] = [];
+
+  for (const l of next) {
+    const p = prevByCode.get(l.codigo);
+    if (!p) {
+      result.push({
+        kind: 'added',
+        codigo: l.codigo,
+        linea: l,
+        cantidadChanged: false,
+        precioChanged: false,
+      });
+      continue;
+    }
+    const cantidadChanged = p.cantidad !== l.cantidad;
+    const precioChanged = (p.precioSinIva ?? null) !== (l.precioSinIva ?? null);
+    const kind =
+      cantidadChanged || precioChanged || p.nombre !== l.nombre
+        ? 'changed'
+        : 'same';
+    result.push({
+      kind,
+      codigo: l.codigo,
+      linea: l,
+      prev: p,
+      cantidadChanged,
+      precioChanged,
+    });
+  }
+
+  for (const l of prev) {
+    if (nextByCode.has(l.codigo)) continue;
+    result.push({
+      kind: 'removed',
+      codigo: l.codigo,
+      linea: l,
+      cantidadChanged: false,
+      precioChanged: false,
+    });
+  }
+
+  return result;
+}
+
 export function formatLineasResumen(lineas: LineaPedidoComercial[]): string {
   if (lineas.length === 0) return '(sin productos)';
   return lineas

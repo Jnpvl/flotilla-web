@@ -196,9 +196,15 @@
                     <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
                       @if (canEditSurtido(pedido)) {
                         <p class="m-0 text-xs text-amber-700">
-                          @if (pedido.requiereRevision) {
-                            Se actualizó el listado. Revísalo, carga en Compact, indica
-                            surtido y guarda. Después ya puedes facturar.
+                          @if (pedido.requiereRevision || hasListadoDiffs(pedido)) {
+                            Se actualizó el listado
+                            @if (hasListadoDiffs(pedido)) {
+                              <span class="text-gray-600">
+                                (resaltado: agregado / eliminado / cantidad o precio).
+                              </span>
+                            }
+                            Revísalo, carga en Compact, indica surtido y guarda.
+                            Después ya puedes facturar.
                           } @else {
                             Indica en “Surtido” cuántas piezas sí entraron y guarda.
                           }
@@ -212,7 +218,7 @@
                           {{
                             savingSurtidoId() === pedido.id
                               ? 'Guardando…'
-                              : pedido.requiereRevision
+                              : pedido.requiereRevision || hasListadoDiffs(pedido)
                                 ? 'Revisar y guardar surtido'
                                 : 'Guardar surtido'
                           }}
@@ -230,37 +236,105 @@
                         </tr>
                       </thead>
                       <tbody>
-                        @for (linea of lineasDe(pedido); track linea.codigo) {
-                          <tr class="border-t border-gray-200/80">
-                            <td class="py-1.5 pr-3 font-mono text-xs text-brand-700">
-                              {{ linea.codigo }}
+                        @for (diff of lineasDiffDe(pedido); track diff.kind + ':' + diff.codigo) {
+                          <tr [class]="lineaDiffRowClass(diff)">
+                            <td
+                              class="py-1.5 pr-3 font-mono text-xs"
+                              [class.text-brand-700]="diff.kind !== 'removed'"
+                              [class.text-red-700]="diff.kind === 'removed'"
+                              [class.line-through]="diff.kind === 'removed'"
+                            >
+                              {{ diff.linea.codigo }}
                             </td>
-                            <td class="py-1.5 pr-3 text-gray-800">{{ linea.nombre }}</td>
-                            <td class="py-1.5 pr-3 text-gray-700">{{ linea.cantidad }}</td>
-                            <td class="py-1.5 pr-3 tabular-nums text-gray-700">
-                              {{
-                                linea.precioSinIva != null
-                                  ? ('$' + linea.precioSinIva)
-                                  : '—'
-                              }}
+                            <td
+                              class="py-1.5 pr-3"
+                              [class.text-gray-800]="diff.kind !== 'removed'"
+                              [class.text-red-800]="diff.kind === 'removed'"
+                              [class.line-through]="diff.kind === 'removed'"
+                            >
+                              <div class="flex flex-wrap items-center gap-2">
+                                <span>{{ diff.linea.nombre }}</span>
+                                @if (lineaDiffBadge(diff); as badge) {
+                                  <span
+                                    class="inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                                    [class.bg-emerald-100]="diff.kind === 'added'"
+                                    [class.text-emerald-800]="diff.kind === 'added'"
+                                    [class.bg-red-100]="diff.kind === 'removed'"
+                                    [class.text-red-800]="diff.kind === 'removed'"
+                                    [class.bg-amber-100]="diff.kind === 'changed'"
+                                    [class.text-amber-900]="diff.kind === 'changed'"
+                                  >
+                                    {{ badge }}
+                                  </span>
+                                }
+                              </div>
+                            </td>
+                            <td
+                              class="py-1.5 pr-3"
+                              [class.text-gray-700]="diff.kind === 'same'"
+                              [class.text-amber-900]="diff.cantidadChanged"
+                              [class.font-semibold]="diff.cantidadChanged"
+                              [class.text-red-800]="diff.kind === 'removed'"
+                              [class.line-through]="diff.kind === 'removed'"
+                            >
+                              @if (diff.cantidadChanged && diff.prev) {
+                                <span class="text-xs font-normal text-gray-500 line-through">
+                                  {{ diff.prev.cantidad }}
+                                </span>
+                                → {{ diff.linea.cantidad }}
+                              } @else {
+                                {{ diff.linea.cantidad }}
+                              }
+                            </td>
+                            <td
+                              class="py-1.5 pr-3 tabular-nums"
+                              [class.text-gray-700]="diff.kind === 'same' && !diff.precioChanged"
+                              [class.text-amber-900]="diff.precioChanged"
+                              [class.font-semibold]="diff.precioChanged"
+                              [class.text-red-800]="diff.kind === 'removed'"
+                              [class.line-through]="diff.kind === 'removed'"
+                            >
+                              @if (diff.precioChanged && diff.prev) {
+                                <span class="text-xs font-normal text-gray-500 line-through">
+                                  {{
+                                    diff.prev.precioSinIva != null
+                                      ? ('$' + diff.prev.precioSinIva)
+                                      : '—'
+                                  }}
+                                </span>
+                                →
+                                {{
+                                  diff.linea.precioSinIva != null
+                                    ? ('$' + diff.linea.precioSinIva)
+                                    : '—'
+                                }}
+                              } @else {
+                                {{
+                                  diff.linea.precioSinIva != null
+                                    ? ('$' + diff.linea.precioSinIva)
+                                    : '—'
+                                }}
+                              }
                             </td>
                             <td class="py-1.5 text-gray-700">
-                              @if (canEditSurtido(pedido)) {
+                              @if (diff.kind === 'removed') {
+                                <span class="text-xs text-red-700">—</span>
+                              } @else if (canEditSurtido(pedido)) {
                                 <input
                                   type="number"
                                   min="0"
                                   class="w-20 rounded border border-gray-200 bg-white px-2 py-1 text-sm"
-                                  [ngModel]="linea.cantidadSurtida ?? linea.cantidad"
+                                  [ngModel]="diff.linea.cantidadSurtida ?? diff.linea.cantidad"
                                   [ngModelOptions]="{ standalone: true }"
-                                  (ngModelChange)="updateSurtido(pedido.id, linea.codigo, $event)"
+                                  (ngModelChange)="updateSurtido(pedido.id, diff.linea.codigo, $event)"
                                   aria-label="Cantidad surtida"
                                 />
                               } @else {
                                 {{
-                                  linea.cantidadSurtida != null
-                                    ? linea.cantidadSurtida
+                                  diff.linea.cantidadSurtida != null
+                                    ? diff.linea.cantidadSurtida
                                     : pedido.estatus === 'facturado'
-                                      ? linea.cantidad
+                                      ? diff.linea.cantidad
                                       : '—'
                                 }}
                               }
