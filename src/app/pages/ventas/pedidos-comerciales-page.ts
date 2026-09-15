@@ -315,8 +315,12 @@ export class PedidosComercialesPage implements OnInit {
       return next;
     });
 
+    const draftProductsDiffer =
+      draft.length > 0 && productFingerprint(draft) !== fp;
+    const listadoCambio = fresh.requiereRevision || draftProductsDiffer;
+
     // Con listado modificado: solo avisa, muestra productos y corta. No factura.
-    if (fresh.requiereRevision) {
+    if (listadoCambio) {
       await this.alerts.info(
         'Listado actualizado',
         'se actualizo el listado, revisalo antes de continuar',
@@ -345,6 +349,48 @@ export class PedidosComercialesPage implements OnInit {
       `Se guardará el surtido y el pedido quedará facturado:\n\n${resumen}`,
     );
     if (!okCantidades) return;
+
+    // Revalidar justo antes de guardar: el vendedor pudo agregar productos
+    // mientras estaba abierta la confirmación.
+    let latest: PedidoComercial;
+    try {
+      latest = await new Promise<PedidoComercial>((resolve, reject) => {
+        this.api.getById(fresh.id).subscribe({ next: resolve, error: reject });
+      });
+    } catch (err: unknown) {
+      void this.alerts.error(
+        'No se pudo verificar el pedido',
+        this.errorMessage(err),
+      );
+      return;
+    }
+
+    const latestFp = productFingerprint(
+      parsePedidoDetalle(latest.detalle).lineas,
+    );
+    if (latest.requiereRevision || latestFp !== fp) {
+      this.pedidos.update((list) =>
+        list.map((p) => (p.id === latest.id ? latest : p)),
+      );
+      const latestParsed = parsePedidoDetalle(latest.detalle);
+      this.surtidoDrafts.update((map) => {
+        const next = new Map(map);
+        next.set(
+          latest.id,
+          mergeSurtidoOntoLineas(latestParsed.lineas, merged).map((l) => ({
+            ...l,
+            cantidadSurtida: l.cantidadSurtida ?? l.cantidad,
+          })),
+        );
+        return next;
+      });
+      await this.alerts.info(
+        'Listado actualizado',
+        'se actualizo el listado, revisalo antes de continuar',
+      );
+      this.marcarListadoVisto(latest.id, latestFp);
+      return;
+    }
 
     const detalle = buildPedidoDetalle(merged, parsed.notas);
     this.api
