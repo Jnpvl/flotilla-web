@@ -351,20 +351,19 @@ export class VisitasPage implements OnInit {
   }
 
   hasDetalle(visita: Visita): boolean {
+    if (!this.isAdmin()) return false;
     if (visita.notas?.trim()) return true;
     if (visita.motivo?.trim()) return true;
     if (visita.notasVisita?.trim()) return true;
-    if (this.isAdmin()) {
-      if (visita.origenRegistro) return true;
-      if (visita.visitadaAt) return true;
-      if (visita.lat != null && visita.lng != null) return true;
-      if (visita.hizoPedido != null || visita.promociono != null) return true;
-    }
+    if (visita.origenRegistro) return true;
+    if (visita.visitadaAt) return true;
+    if (visita.lat != null && visita.lng != null) return true;
+    if (visita.hizoPedido != null || visita.promociono != null) return true;
     return false;
   }
 
   openDetalle(visita: Visita): void {
-    if (!this.hasDetalle(visita)) return;
+    if (!this.isAdmin() || !this.hasDetalle(visita)) return;
     this.detailVisita.set(visita);
   }
 

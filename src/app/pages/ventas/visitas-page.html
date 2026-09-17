@@ -198,11 +198,13 @@
             >
               Estatus
             </th>
-            <th
-              class="bg-gray-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500"
-            >
-              Detalle
-            </th>
+            @if (isAdmin()) {
+              <th
+                class="bg-gray-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500"
+              >
+                Detalle
+              </th>
+            }
             <th
               class="bg-gray-50 px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500"
             >
@@ -232,19 +234,21 @@
                   {{ estatusLabel(visita.estatus) }}
                 </span>
               </td>
-              <td class="px-4 py-3 align-top">
-                @if (hasDetalle(visita)) {
-                  <button
-                    type="button"
-                    class="text-xs font-medium text-brand-700 hover:underline"
-                    (click)="openDetalle(visita)"
-                  >
-                    Ver detalle
-                  </button>
-                } @else {
-                  <span class="text-xs text-gray-400">—</span>
-                }
-              </td>
+              @if (isAdmin()) {
+                <td class="px-4 py-3 align-top">
+                  @if (hasDetalle(visita)) {
+                    <button
+                      type="button"
+                      class="text-xs font-medium text-brand-700 hover:underline"
+                      (click)="openDetalle(visita)"
+                    >
+                      Ver detalle
+                    </button>
+                  } @else {
+                    <span class="text-xs text-gray-400">—</span>
+                  }
+                </td>
+              }
               <td class="px-4 py-3 align-top text-right">
                 @if (canManage() && visita.estatus === 'planeada') {
                   <div class="flex flex-wrap justify-end gap-2">
