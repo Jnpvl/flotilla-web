@@ -144,19 +144,28 @@
                 </span>
               </td>
               <td class="px-4 py-3 text-right">
-                <div class="flex flex-wrap justify-end gap-2">
+                <div class="flex flex-wrap items-center justify-end gap-2">
                   @if (canEdit(pedido)) {
                     <a
-                      class="text-xs font-medium text-brand-700 hover:underline"
+                      class="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
                       [routerLink]="['/ventas/pedidos', pedido.id]"
                     >
                       Editar
                     </a>
                   }
+                  @if (canMarkFacturado(pedido)) {
+                    <button
+                      type="button"
+                      class="rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-xs font-medium text-sky-800 hover:bg-sky-100"
+                      (click)="avisarDiferenciasWhatsApp(pedido)"
+                    >
+                      Avisar diferencias
+                    </button>
+                  }
                   @if (canSendPrefactura(pedido)) {
                     <button
                       type="button"
-                      class="text-xs font-medium text-amber-700 hover:underline"
+                      class="rounded-md bg-amber-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
                       (click)="sendToPrefactura(pedido)"
                     >
                       Enviar a prefactura
@@ -165,14 +174,7 @@
                   @if (canMarkFacturado(pedido)) {
                     <button
                       type="button"
-                      class="text-xs font-medium text-sky-700 hover:underline"
-                      (click)="avisarWhatsApp(pedido)"
-                    >
-                      Avisar WhatsApp
-                    </button>
-                    <button
-                      type="button"
-                      class="text-xs font-medium text-emerald-700 hover:underline"
+                      class="rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
                       (click)="markFacturado(pedido)"
                     >
                       Marcar facturado
@@ -181,7 +183,7 @@
                   @if (canDelete(pedido)) {
                     <button
                       type="button"
-                      class="text-xs font-medium text-red-600 hover:underline"
+                      class="rounded-md px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
                       (click)="askRemove(pedido)"
                     >
                       Eliminar

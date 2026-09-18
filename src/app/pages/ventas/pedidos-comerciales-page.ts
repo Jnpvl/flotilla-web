@@ -481,6 +481,10 @@ export class PedidosComercialesPage implements OnInit {
       .subscribe({
         next: async () => {
           await this.alerts.success('Pedido facturado');
+          await this.offerWhatsAppAviso(
+            fresh,
+            `Pedido #${fresh.id} de ${this.clienteLabel(fresh)} se facturó.`,
+          );
           this.load();
         },
         error: async (err: unknown) => {
@@ -503,6 +507,10 @@ export class PedidosComercialesPage implements OnInit {
         await this.alerts.success('Enviado a prefactura');
         this.expandedIds.update((set) => new Set(set).add(pedido.id));
         this.ensureSurtidoDraft(updated);
+        await this.offerWhatsAppAviso(
+          updated,
+          `Pedido #${updated.id} de ${this.clienteLabel(updated)} se mandó a prefactura.`,
+        );
         this.load();
       },
       error: (err: unknown) => {
@@ -511,7 +519,8 @@ export class PedidosComercialesPage implements OnInit {
     });
   }
 
-  avisarWhatsApp(pedido: PedidoComercial): void {
+  /** Aviso de diferencias de surtido (no confundir con prefactura/facturado). */
+  avisarDiferenciasWhatsApp(pedido: PedidoComercial): void {
     const diffs = this.lineasDe(pedido).filter(
       (l) => l.cantidadSurtida != null && l.cantidadSurtida !== l.cantidad,
     );
@@ -532,18 +541,40 @@ export class PedidosComercialesPage implements OnInit {
       return `• ${l.codigo} ${l.nombre}: se pidieron ${l.cantidad} y tenemos ${surtido} (más de lo solicitado)`;
     });
     const text = [
-      `Hola, del cliente ${pedido.clienteNombre}, pedido #${pedido.id}.`,
+      `Hola, del cliente ${this.clienteLabel(pedido)}, pedido #${pedido.id}.`,
       ``,
       ...lines,
       ``,
       `¿Timbro el pedido o habrá algún cambio?`,
     ].join('\n');
 
+    this.openWhatsApp(text);
+  }
+
+  private clienteLabel(pedido: PedidoComercial): string {
+    const codigo = pedido.clienteCodigo?.trim();
+    if (codigo) return `${codigo} — ${pedido.clienteNombre}`;
+    return pedido.clienteNombre;
+  }
+
+  private openWhatsApp(text: string): void {
     window.open(
       `https://wa.me/?text=${encodeURIComponent(text)}`,
       '_blank',
       'noopener,noreferrer',
     );
+  }
+
+  private async offerWhatsAppAviso(
+    _pedido: PedidoComercial,
+    text: string,
+  ): Promise<void> {
+    const share = await this.alerts.confirm(
+      '¿Avisar por WhatsApp?',
+      text,
+    );
+    if (!share) return;
+    this.openWhatsApp(text);
   }
 
   /** Facturista no edita el pedido; vendedor sí puede en prefactura. */
