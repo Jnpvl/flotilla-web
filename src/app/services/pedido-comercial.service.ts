@@ -12,6 +12,7 @@ export type PedidoComercialEstatus =
 export type PedidoComercial = {
   id: number;
   clienteNombre: string;
+  clienteCodigo: string | null;
   detalle: string | null;
   fechaPedido: string;
   estatus: PedidoComercialEstatus;
@@ -36,6 +37,7 @@ export type PedidoComercialListResult = {
 
 export type CreatePedidoComercialPayload = {
   clienteNombre: string;
+  clienteCodigo?: string | null;
   detalle?: string | null;
   fechaPedido: string;
   estatus?: PedidoComercialEstatus;
@@ -44,6 +46,7 @@ export type CreatePedidoComercialPayload = {
 
 export type UpdatePedidoComercialPayload = {
   clienteNombre?: string;
+  clienteCodigo?: string | null;
   detalle?: string | null;
   fechaPedido?: string;
   estatus?: PedidoComercialEstatus;

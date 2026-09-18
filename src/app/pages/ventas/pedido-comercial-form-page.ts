@@ -43,6 +43,8 @@ export class PedidoComercialFormPage implements OnInit {
   readonly clienteSuggestions = signal<CatalogItem[]>([]);
   readonly showClienteSuggestions = signal(false);
   readonly selectedCliente = signal<CatalogItem | null>(null);
+  /** Código Contpaq del cliente seleccionado (persistido en el pedido). */
+  readonly clienteCodigo = signal<string | null>(null);
 
   readonly productoQuery = signal('');
   readonly productoSuggestions = signal<CatalogItem[]>([]);
@@ -162,7 +164,18 @@ export class PedidoComercialFormPage implements OnInit {
           notas: parsed.notas,
         });
         this.formEstatus.set(estatus);
-        this.clienteQuery.set(pedido.clienteNombre);
+        this.clienteCodigo.set(pedido.clienteCodigo?.trim() || null);
+        this.clienteQuery.set(
+          pedido.clienteCodigo
+            ? `${pedido.clienteCodigo} — ${pedido.clienteNombre}`
+            : pedido.clienteNombre,
+        );
+        if (pedido.clienteCodigo) {
+          this.selectedCliente.set({
+            codigo: pedido.clienteCodigo,
+            nombre: pedido.clienteNombre,
+          });
+        }
         this.lineas.set(lineas);
         this.loading.set(false);
       },
@@ -184,6 +197,7 @@ export class PedidoComercialFormPage implements OnInit {
   onClienteInput(value: string): void {
     this.clienteQuery.set(value);
     this.selectedCliente.set(null);
+    this.clienteCodigo.set(null);
     this.form.controls.clienteNombre.setValue(value);
     this.showClienteSuggestions.set(true);
     const seq = ++this.clienteSearchSeq;
@@ -195,6 +209,7 @@ export class PedidoComercialFormPage implements OnInit {
 
   selectCliente(cliente: CatalogItem): void {
     this.selectedCliente.set(cliente);
+    this.clienteCodigo.set(cliente.codigo);
     this.clienteQuery.set(`${cliente.codigo} — ${cliente.nombre}`);
     this.form.controls.clienteNombre.setValue(cliente.nombre);
     this.showClienteSuggestions.set(false);
@@ -369,6 +384,7 @@ export class PedidoComercialFormPage implements OnInit {
 
     const payload = {
       clienteNombre: value.clienteNombre.trim(),
+      clienteCodigo: this.clienteCodigo(),
       detalle: buildPedidoDetalle(lineas, value.notas.trim()),
       fechaPedido: value.fechaPedido,
       estatus: value.estatus,

@@ -22,7 +22,7 @@
       <input
         type="search"
         class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
-        placeholder="Nombre del cliente…"
+        placeholder="Nombre o código del cliente…"
         [ngModel]="searchQ()"
         [ngModelOptions]="{ standalone: true }"
         (ngModelChange)="onSearchInput($event)"
@@ -109,6 +109,10 @@
               <td class="px-4 py-3">
                 <div class="font-medium text-gray-900">{{ pedido.clienteNombre }}</div>
                 <div class="mt-0.5 text-xs text-gray-500">
+                  @if (pedido.clienteCodigo) {
+                    <span class="font-mono text-brand-700">{{ pedido.clienteCodigo }}</span>
+                    <span class="mx-1">·</span>
+                  }
                   {{ lineasDe(pedido).length }}
                   {{ lineasDe(pedido).length === 1 ? 'producto' : 'productos' }}
                   @if (pedido.requiereRevision) {
