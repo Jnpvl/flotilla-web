@@ -3,7 +3,7 @@
     <div>
       <h1 class="m-0 text-xl font-semibold text-gray-800">Pedidos</h1>
       <p class="mt-1 text-sm text-gray-500">
-        Alta de entregas desde el catálogo de clientes. El estatus solo lo cambia el admin.
+        Alta de entregas a partir de una factura timbrada. El estatus solo lo cambia el admin.
       </p>
     </div>
     <button
@@ -17,11 +17,11 @@
 
   <div class="mb-4 grid gap-3 sm:grid-cols-2">
     <label class="grid gap-1">
-      <span class="text-xs font-medium text-gray-600">Buscar lugar</span>
+      <span class="text-xs font-medium text-gray-600">Buscar</span>
       <input
         type="search"
         class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
-        placeholder="Ej. Bodega Norte…"
+        placeholder="Cliente, factura o lugar…"
         [ngModel]="searchQ()"
         [ngModelOptions]="{ standalone: true }"
         (ngModelChange)="onSearchInput($event)"
@@ -71,6 +71,7 @@
       <table class="w-full min-w-[760px] border-collapse text-sm md:min-w-0">
         <thead class="hidden md:table-header-group">
           <tr>
+            <th class="w-10 bg-gray-50 px-3 py-3"></th>
             <th class="bg-gray-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
               Lugar de entrega
             </th>
@@ -99,10 +100,42 @@
               class="grid gap-2 border-b border-gray-200 p-3.5 md:table-row md:border-0 md:p-0 md:hover:bg-gray-50"
             >
               <td
+                class="flex justify-between gap-4 border-0 p-0 text-sm md:table-cell md:border-b md:border-gray-200 md:px-3 md:py-3 md:align-middle"
+              >
+                <span class="text-xs font-semibold text-gray-500 md:hidden">Detalle</span>
+                <button
+                  type="button"
+                  class="grid h-7 w-7 place-items-center rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                  (click)="toggleExpand(pedido)"
+                  [attr.aria-expanded]="isExpanded(pedido.id)"
+                  [attr.aria-label]="
+                    isExpanded(pedido.id) ? 'Ocultar productos' : 'Ver productos'
+                  "
+                >
+                  <span
+                    class="text-xs leading-none transition-transform"
+                    [class.rotate-90]="isExpanded(pedido.id)"
+                  >
+                    ▸
+                  </span>
+                </button>
+              </td>
+              <td
                 class="flex justify-between gap-4 border-0 p-0 text-sm md:table-cell md:border-b md:border-gray-200 md:px-4 md:py-3"
               >
                 <span class="text-xs font-semibold text-gray-500 md:hidden">Lugar</span>
-                {{ pedido.lugarEntrega }}
+                <div>
+                  <div>{{ pedido.lugarEntrega }}</div>
+                  @if (pedido.facturaFolio) {
+                    <div class="mt-0.5 text-xs text-gray-500">
+                      Factura {{ facturaLabel(pedido) }}
+                      @if (pedido.partidas.length) {
+                        · {{ pedido.partidas.length }}
+                        producto{{ pedido.partidas.length === 1 ? '' : 's' }}
+                      }
+                    </div>
+                  }
+                </div>
               </td>
               <td
                 class="flex justify-between gap-4 border-0 p-0 text-sm md:table-cell md:border-b md:border-gray-200 md:px-4 md:py-3"
@@ -161,14 +194,7 @@
               >
                 <span class="text-xs font-semibold text-gray-500 md:hidden">Acciones</span>
                 <div class="flex gap-2 md:justify-end">
-                  @if (canEditOrRemove(pedido)) {
-                    <button
-                      type="button"
-                      class="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                      (click)="openEdit(pedido)"
-                    >
-                      Editar
-                    </button>
+                  @if (canRemove(pedido)) {
                     <button
                       type="button"
                       class="rounded-md border border-red-200 bg-white px-2.5 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50"
@@ -184,6 +210,142 @@
                 </div>
               </td>
             </tr>
+
+            @if (isExpanded(pedido.id)) {
+              <tr
+                class="grid border-b border-gray-200 bg-gray-50/80 p-3.5 md:table-row md:border-0 md:p-0"
+              >
+                <td
+                  colspan="7"
+                  class="min-w-0 max-w-full border-0 p-0 text-sm md:table-cell md:border-b md:border-gray-200 md:px-4 md:py-3"
+                >
+                  @if (pedido.clienteNombre || pedido.clienteCodigo || pedido.facturaFolio) {
+                    <div class="mb-3 grid gap-2 sm:grid-cols-2">
+                      <div>
+                        <p class="m-0 text-[11px] font-medium uppercase tracking-wide text-gray-500">
+                          Cliente
+                        </p>
+                        <p class="m-0 mt-0.5 text-sm font-medium text-gray-800">
+                          {{ pedido.clienteCodigo || '—' }} · {{ pedido.clienteNombre || '—' }}
+                        </p>
+                        @if (pedido.clienteRfc) {
+                          <p class="m-0 text-xs text-gray-500">RFC {{ pedido.clienteRfc }}</p>
+                        }
+                      </div>
+                      <div>
+                        <p class="m-0 text-[11px] font-medium uppercase tracking-wide text-gray-500">
+                          Factura
+                        </p>
+                        <p class="m-0 mt-0.5 text-sm font-medium text-gray-800">
+                          {{ facturaLabel(pedido) || '—' }}
+                          @if (pedido.facturaTotal != null) {
+                            · {{ formatMoney(pedido.facturaTotal) }}
+                          }
+                        </p>
+                        @if (pedido.facturaFecha) {
+                          <p class="m-0 text-xs text-gray-500">{{ formatDay(pedido.facturaFecha) }}</p>
+                        }
+                      </div>
+                    </div>
+                  }
+
+                  @if (pedido.estatus === 'entregado') {
+                    <div class="mb-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_200px]">
+                      <div class="rounded-md border border-gray-200 bg-white px-3 py-2">
+                        <p class="m-0 text-[11px] font-medium uppercase tracking-wide text-gray-500">
+                          Recibió
+                        </p>
+                        <p class="m-0 mt-0.5 text-sm font-medium text-gray-800">
+                          {{ pedido.recibidoPor || 'Sin nombre' }}
+                        </p>
+                        @if (pedido.firmadoAt) {
+                          <p class="m-0 text-xs text-gray-500">{{ formatDate(pedido.firmadoAt) }}</p>
+                        }
+                      </div>
+                      <div class="rounded-md border border-gray-200 bg-white px-3 py-2">
+                        <p class="m-0 text-[11px] font-medium uppercase tracking-wide text-gray-500">
+                          Firma
+                        </p>
+                        @if (firmaSrc(pedido.id); as src) {
+                          <img
+                            [src]="src"
+                            alt="Firma de quien recibió"
+                            class="mt-1 h-20 w-full object-contain"
+                          />
+                        } @else if (pedido.tieneFirma && firmas()[pedido.id] === undefined) {
+                          <p class="m-0 mt-2 text-xs text-gray-500">Cargando firma…</p>
+                        } @else {
+                          <p class="m-0 mt-2 text-xs text-gray-500">Sin firma</p>
+                        }
+                      </div>
+                    </div>
+                  }
+
+                  @if (pedido.partidas.length === 0) {
+                    <p class="m-0 text-sm text-gray-500">Este pedido no tiene productos.</p>
+                  } @else {
+                    <div class="overflow-x-auto rounded-md border border-gray-200 bg-white">
+                      <table class="w-full min-w-[520px] border-collapse text-sm">
+                        <thead>
+                          <tr>
+                            <th class="bg-gray-50 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Código
+                            </th>
+                            <th class="bg-gray-50 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Producto
+                            </th>
+                            <th class="bg-gray-50 px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Cant.
+                            </th>
+                            <th class="bg-gray-50 px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Precio
+                            </th>
+                            <th class="bg-gray-50 px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Total
+                            </th>
+                            @if (pedido.estatus === 'entregado') {
+                              <th class="bg-gray-50 px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                Entregado
+                              </th>
+                            }
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (partida of pedido.partidas; track $index) {
+                            <tr class="border-t border-gray-100">
+                              <td class="px-3 py-2 font-mono text-xs text-gray-700">
+                                {{ partida.codigoProducto || '—' }}
+                              </td>
+                              <td class="px-3 py-2 text-gray-800">{{ partida.producto || '—' }}</td>
+                              <td class="px-3 py-2 text-right text-gray-700">
+                                {{ formatQty(partida.cantidad) }}
+                              </td>
+                              <td class="px-3 py-2 text-right text-gray-700">
+                                {{ formatMoney(partida.precioUnitario) }}
+                              </td>
+                              <td class="px-3 py-2 text-right font-medium text-gray-800">
+                                {{ formatMoney(partida.totalPartida) }}
+                              </td>
+                              @if (pedido.estatus === 'entregado') {
+                                <td class="px-3 py-2 text-center">
+                                  @if (partida.entregado === true) {
+                                    <span class="font-semibold text-green-700">Sí</span>
+                                  } @else if (partida.entregado === false) {
+                                    <span class="font-semibold text-red-600">No</span>
+                                  } @else {
+                                    <span class="text-gray-400">—</span>
+                                  }
+                                </td>
+                              }
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  }
+                </td>
+              </tr>
+            }
           }
         </tbody>
       </table>
@@ -221,14 +383,14 @@
     class="fixed inset-0 z-50 grid place-items-center bg-gray-900/45 p-4"
   >
     <div
-      class="w-full max-w-md rounded-lg border border-gray-200 bg-white shadow-lg"
+      class="max-h-[90svh] w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg"
+      [class.max-w-4xl]="!!selectedFactura()"
+      [class.max-w-md]="!selectedFactura()"
       role="dialog"
       aria-modal="true"
     >
       <header class="flex items-center justify-between border-b border-gray-200 px-4 py-3.5">
-        <h2 class="m-0 text-base font-semibold">
-          {{ editingId() === null ? 'Nuevo pedido' : 'Editar pedido' }}
-        </h2>
+        <h2 class="m-0 text-base font-semibold">Nuevo pedido</h2>
         <button
           type="button"
           class="grid h-7 w-7 place-items-center rounded bg-gray-100 text-lg leading-none text-gray-600"
@@ -239,44 +401,120 @@
         </button>
       </header>
 
-      <form class="grid gap-3.5 p-4" [formGroup]="form" (ngSubmit)="submit()">
-        <div class="relative grid gap-1">
-          <span class="text-xs font-medium text-gray-600">Cliente</span>
-          <input
-            type="text"
-            class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
-            placeholder="Buscar por código o nombre…"
-            [ngModel]="clienteQuery()"
-            [ngModelOptions]="{ standalone: true }"
-            (ngModelChange)="onClienteInput($event)"
-            (focus)="onClienteInput(clienteQuery())"
-            autocomplete="off"
-          />
-          <input type="hidden" formControlName="lugarEntrega" />
-          @if (showClienteSuggestions() && clienteSuggestions().length > 0) {
-            <ul
-              class="absolute top-full z-10 m-0 mt-1 max-h-48 w-full list-none overflow-y-auto rounded-md border border-gray-200 bg-white p-0 shadow-lg"
-            >
-              @for (c of clienteSuggestions(); track c.codigo) {
-                <li>
+      <form class="grid gap-3.5 p-4" (ngSubmit)="submit()">
+          <div class="grid gap-1">
+            <span class="text-xs font-medium text-gray-600">Número de factura</span>
+            <div class="flex gap-2">
+              <input
+                type="text"
+                inputmode="numeric"
+                class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
+                placeholder="Ej. 41757"
+                [ngModel]="facturaFolioInput()"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="facturaFolioInput.set($event)"
+                (keydown.enter)="$event.preventDefault(); buscarFactura()"
+                autocomplete="off"
+              />
+              <button
+                type="button"
+                class="shrink-0 rounded-md border border-brand-700 bg-white px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:cursor-wait disabled:opacity-65"
+                [disabled]="lookingUpFactura()"
+                (click)="buscarFactura()"
+              >
+                {{ lookingUpFactura() ? 'Buscando…' : 'Buscar' }}
+              </button>
+            </div>
+            @if (lookupError()) {
+              <p class="m-0 text-xs text-red-600">{{ lookupError() }}</p>
+            }
+          </div>
+
+          @if (facturaOptions().length > 1) {
+            <div class="grid gap-1">
+              <span class="text-xs font-medium text-gray-600">
+                Hay varias facturas con ese folio
+              </span>
+              <div class="grid gap-1">
+                @for (factura of facturaOptions(); track factura.idDocumento) {
                   <button
                     type="button"
-                    class="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-brand-50"
-                    (click)="selectCliente(c)"
+                    class="rounded-md border px-3 py-2 text-left text-sm hover:bg-brand-50"
+                    [class.border-brand-600]="selectedFactura()?.idDocumento === factura.idDocumento"
+                    [class.bg-brand-50]="selectedFactura()?.idDocumento === factura.idDocumento"
+                    [class.border-gray-200]="selectedFactura()?.idDocumento !== factura.idDocumento"
+                    (click)="selectFactura(factura)"
                   >
-                    <span class="shrink-0 font-mono text-xs text-brand-700">{{ c.codigo }}</span>
-                    <span class="text-gray-800">{{ c.nombre }}</span>
+                    <span class="font-medium text-gray-800">
+                      {{ factura.serie }}{{ factura.serie ? '-' : '' }}{{ factura.factura }}
+                    </span>
+                    <span class="text-gray-600">
+                      · {{ factura.codigoCliente }} {{ factura.cliente }}
+                    </span>
+                    <span class="block text-xs text-gray-500">
+                      {{ formatDay(factura.fechaDocumento) }} · {{ formatMoney(factura.totalFactura) }}
+                    </span>
                   </button>
-                </li>
-              }
-            </ul>
+                }
+              </div>
+            </div>
           }
-          @if (editingId() === null) {
-            <p class="m-0 text-xs text-gray-500">
-              Al guardar queda como listo para entregar.
-            </p>
-          }
-        </div>
+
+        @if (selectedFactura(); as factura) {
+          <div class="grid gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <div class="grid gap-2 sm:grid-cols-2">
+              <div>
+                <p class="m-0 text-[11px] font-medium uppercase tracking-wide text-gray-500">Cliente</p>
+                <p class="m-0 mt-0.5 text-sm font-medium text-gray-800">
+                  {{ factura.codigoCliente || '—' }} · {{ factura.cliente || '—' }}
+                </p>
+                @if (factura.rfc) {
+                  <p class="m-0 text-xs text-gray-500">RFC {{ factura.rfc }}</p>
+                }
+              </div>
+              <div>
+                <p class="m-0 text-[11px] font-medium uppercase tracking-wide text-gray-500">Factura</p>
+                <p class="m-0 mt-0.5 text-sm font-medium text-gray-800">
+                  {{ factura.serie }}{{ factura.serie ? '-' : '' }}{{ factura.factura }}
+                  · {{ formatMoney(factura.totalFactura) }}
+                </p>
+                <p class="m-0 text-xs text-gray-500">{{ formatDay(factura.fechaDocumento) }}</p>
+              </div>
+            </div>
+
+            @if (factura.partidas.length === 0) {
+              <p class="m-0 text-sm text-gray-500">Esta factura no tiene partidas.</p>
+            } @else {
+              <div class="overflow-x-auto rounded-md border border-gray-200 bg-white">
+                <table class="w-full min-w-[520px] border-collapse text-sm">
+                  <thead>
+                    <tr>
+                      <th class="bg-gray-50 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Código</th>
+                      <th class="bg-gray-50 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Producto</th>
+                      <th class="bg-gray-50 px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Cant.</th>
+                      <th class="bg-gray-50 px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Precio</th>
+                      <th class="bg-gray-50 px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (partida of factura.partidas; track $index) {
+                      <tr class="border-t border-gray-100">
+                        <td class="px-3 py-2 font-mono text-xs text-gray-700">{{ partida.codigoProducto || '—' }}</td>
+                        <td class="px-3 py-2 text-gray-800">{{ partida.producto || '—' }}</td>
+                        <td class="px-3 py-2 text-right text-gray-700">{{ formatQty(partida.cantidad) }}</td>
+                        <td class="px-3 py-2 text-right text-gray-700">{{ formatMoney(partida.precioUnitario) }}</td>
+                        <td class="px-3 py-2 text-right font-medium text-gray-800">{{ formatMoney(partida.totalPartida) }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+          <p class="m-0 text-xs text-gray-500">
+            Al guardar queda como listo para entregar.
+          </p>
+        }
 
         <div class="mt-1 flex justify-end gap-2">
           <button
@@ -289,7 +527,7 @@
           <button
             type="submit"
             class="rounded-md bg-brand-700 px-3.5 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:cursor-wait disabled:opacity-65"
-            [disabled]="saving()"
+            [disabled]="saving() || lookingUpFactura() || !selectedFactura()"
           >
             {{ saving() ? 'Guardando…' : 'Guardar' }}
           </button>

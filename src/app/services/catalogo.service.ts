@@ -14,6 +14,32 @@ export type CatalogAgente = {
   nombre: string;
 };
 
+export type FacturaPartida = {
+  codigoProducto: string;
+  producto: string;
+  cantidad: number;
+  precioUnitario: number;
+  totalPartida: number;
+  entregado?: boolean;
+};
+
+export type FacturaDocumento = {
+  idDocumento: number;
+  factura: number;
+  serie: string;
+  fechaDocumento: string | null;
+  totalFactura: number;
+  uuid: string;
+  fechaTimbrado: string | null;
+  horaTimbrado: string | null;
+  estadoTimbrado: number | null;
+  idCliente: number | null;
+  codigoCliente: string;
+  cliente: string;
+  rfc: string;
+  partidas: FacturaPartida[];
+};
+
 type CatalogListResponse<T> = {
   items: T[];
 };
@@ -57,5 +83,13 @@ export class CatalogoService {
         map((res) => res.items ?? []),
         catchError(() => of([])),
       );
+  }
+
+  lookupFactura(folio: number): Observable<FacturaDocumento[]> {
+    return this.api
+      .get<CatalogListResponse<FacturaDocumento>>('/catalogos/facturas', {
+        params: { folio },
+      })
+      .pipe(map((res) => res.items ?? []));
   }
 }

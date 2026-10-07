@@ -1,11 +1,11 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AlertService } from '../../services/alert.service';
 import { AuthService } from '../../services/auth.service';
 import {
-  type CatalogItem,
+  type FacturaDocumento,
   CatalogoService,
 } from '../../services/catalogo.service';
 import {
@@ -13,11 +13,11 @@ import {
   type PedidoEstatus,
   PedidoService,
 } from '../../services/pedido.service';
-import { formatWallClock } from '../../utils/local-datetime';
+import { formatWallClock, formatWallClockDay } from '../../utils/local-datetime';
 
 @Component({
   selector: 'app-pedidos-page',
-  imports: [ReactiveFormsModule, FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink],
   templateUrl: './pedidos-page.html',
 })
 export class PedidosPage implements OnInit {
@@ -25,13 +25,11 @@ export class PedidosPage implements OnInit {
   private readonly catalogo = inject(CatalogoService);
   private readonly auth = inject(AuthService);
   private readonly alerts = inject(AlertService);
-  private readonly fb = inject(FormBuilder);
 
   readonly pedidos = signal<Pedido[]>([]);
   readonly loading = signal(true);
   readonly saving = signal(false);
   readonly showForm = signal(false);
-  readonly editingId = signal<number | null>(null);
 
   readonly page = signal(1);
   readonly pageSize = signal(10);
@@ -39,17 +37,16 @@ export class PedidosPage implements OnInit {
   readonly totalPages = signal(1);
   readonly filterEstatus = signal<PedidoEstatus | ''>('');
   readonly searchQ = signal('');
+  readonly expandedIds = signal<Set<number>>(new Set());
+  readonly firmas = signal<Record<number, string | null>>({});
 
-  readonly clienteQuery = signal('');
-  readonly clienteSuggestions = signal<CatalogItem[]>([]);
-  readonly showClienteSuggestions = signal(false);
-  private clienteSearchSeq = 0;
+  readonly facturaFolioInput = signal('');
+  readonly lookingUpFactura = signal(false);
+  readonly facturaOptions = signal<FacturaDocumento[]>([]);
+  readonly selectedFactura = signal<FacturaDocumento | null>(null);
+  readonly lookupError = signal('');
 
   readonly isAdmin = computed(() => this.auth.user()?.rol === 'admin');
-
-  readonly form = this.fb.nonNullable.group({
-    lugarEntrega: ['', [Validators.required]],
-  });
 
   readonly estatusOptions: PedidoEstatus[] = [
     'listo_para_entregar',
@@ -113,104 +110,108 @@ export class PedidosPage implements OnInit {
     this.load();
   }
 
-  openCreate(): void {
-    this.editingId.set(null);
-    this.form.reset({ lugarEntrega: '' });
-    this.clienteQuery.set('');
-    this.clienteSuggestions.set([]);
-    this.showClienteSuggestions.set(false);
-    this.showForm.set(true);
+  toggleExpand(pedido: Pedido): void {
+    const id = pedido.id;
+    const opening = !this.expandedIds().has(id);
+    this.expandedIds.update((set) => {
+      const next = new Set(set);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    if (opening && pedido.tieneFirma && this.firmas()[id] === undefined) {
+      this.pedidosApi.getById(id).subscribe({
+        next: (full) => {
+          this.firmas.update((map) => ({ ...map, [id]: full.firma }));
+        },
+        error: () => {
+          this.firmas.update((map) => ({ ...map, [id]: null }));
+        },
+      });
+    }
   }
 
-  openEdit(pedido: Pedido): void {
-    if (!this.canEditOrRemove(pedido)) {
-      void this.alerts.error(
-        'No permitido',
-        'Solo se pueden editar pedidos en listo para entregar',
-      );
-      return;
-    }
-    this.editingId.set(pedido.id);
-    this.form.reset({ lugarEntrega: pedido.lugarEntrega });
-    this.clienteQuery.set(pedido.lugarEntrega);
-    this.clienteSuggestions.set([]);
-    this.showClienteSuggestions.set(false);
+  firmaSrc(id: number): string | null {
+    const raw = this.firmas()[id];
+    if (!raw) return null;
+    return raw.startsWith('data:') ? raw : `data:image/png;base64,${raw}`;
+  }
+
+  isExpanded(id: number): boolean {
+    return this.expandedIds().has(id);
+  }
+
+  openCreate(): void {
+    this.resetFacturaLookup();
     this.showForm.set(true);
   }
 
   closeForm(): void {
     this.showForm.set(false);
-    this.editingId.set(null);
-    this.clienteQuery.set('');
-    this.clienteSuggestions.set([]);
-    this.showClienteSuggestions.set(false);
+    this.resetFacturaLookup();
   }
 
-  onClienteInput(value: string): void {
-    this.clienteQuery.set(value);
-    this.form.controls.lugarEntrega.setValue(value.trim());
-    this.showClienteSuggestions.set(true);
-    const seq = ++this.clienteSearchSeq;
-    // Sin agenteId: todos los clientes activos de Contpaq.
-    this.catalogo.searchClientes(value, 30).subscribe((items) => {
-      if (seq !== this.clienteSearchSeq) return;
-      this.clienteSuggestions.set(items);
+  buscarFactura(): void {
+    const folio = Number(this.facturaFolioInput().trim());
+    if (!Number.isInteger(folio) || folio <= 0) {
+      this.lookupError.set('Escribe un número de factura válido');
+      this.facturaOptions.set([]);
+      this.selectedFactura.set(null);
+      return;
+    }
+
+    this.lookingUpFactura.set(true);
+    this.lookupError.set('');
+    this.facturaOptions.set([]);
+    this.selectedFactura.set(null);
+    this.catalogo.lookupFactura(folio).subscribe({
+      next: (items) => {
+        this.lookingUpFactura.set(false);
+        this.facturaOptions.set(items);
+        this.selectedFactura.set(items.length === 1 ? items[0] : null);
+      },
+      error: (err: unknown) => {
+        this.lookingUpFactura.set(false);
+        this.lookupError.set(this.errorMessage(err, 'No se encontró la factura'));
+      },
     });
   }
 
-  selectCliente(cliente: CatalogItem): void {
-    const label = `${cliente.codigo} — ${cliente.nombre}`;
-    this.clienteQuery.set(label);
-    this.form.controls.lugarEntrega.setValue(label);
-    this.showClienteSuggestions.set(false);
+  selectFactura(factura: FacturaDocumento): void {
+    this.selectedFactura.set(factura);
+    this.lookupError.set('');
   }
 
   submit(): void {
-    if (this.form.invalid || this.saving()) {
-      this.form.markAllAsTouched();
+    if (this.saving()) return;
+
+    const factura = this.selectedFactura();
+    if (!factura) {
+      this.lookupError.set('Busca una factura para crear el pedido');
       return;
     }
 
-    const { lugarEntrega } = this.form.getRawValue();
-    const editingId = this.editingId();
     this.saving.set(true);
-
-    if (editingId === null) {
-      this.pedidosApi.create({ lugarEntrega: lugarEntrega.trim() }).subscribe({
-        next: async () => {
-          this.saving.set(false);
-          this.closeForm();
-          await this.alerts.success(
-            'Pedido creado',
-            'Quedó como listo para entregar',
-          );
-          this.page.set(1);
-          this.load();
-        },
-        error: (err: unknown) => {
-          this.saving.set(false);
-          void this.alerts.error('No se pudo crear', this.errorMessage(err));
-        },
-      });
-      return;
-    }
-
-    this.pedidosApi.update(editingId, { lugarEntrega: lugarEntrega.trim() }).subscribe({
+    this.pedidosApi.create({ idDocumento: factura.idDocumento }).subscribe({
       next: async () => {
         this.saving.set(false);
         this.closeForm();
-        await this.alerts.success('Pedido actualizado', 'Los cambios se guardaron correctamente');
+        await this.alerts.success(
+          'Pedido creado',
+          'Quedó como listo para entregar',
+        );
+        this.page.set(1);
         this.load();
       },
       error: (err: unknown) => {
         this.saving.set(false);
-        void this.alerts.error('No se pudo actualizar', this.errorMessage(err));
+        void this.alerts.error('No se pudo crear', this.errorMessage(err));
       },
     });
   }
 
   async askRemove(pedido: Pedido): Promise<void> {
-    if (!this.canEditOrRemove(pedido)) {
+    if (!this.canRemove(pedido)) {
       void this.alerts.error(
         'No permitido',
         'Solo se pueden eliminar pedidos en listo para entregar',
@@ -242,7 +243,7 @@ export class PedidosPage implements OnInit {
     return pedido.estatus === 'listo_para_entregar';
   }
 
-  canEditOrRemove(pedido: Pedido): boolean {
+  canRemove(pedido: Pedido): boolean {
     return this.isListoParaEntregar(pedido);
   }
 
@@ -312,6 +313,38 @@ export class PedidosPage implements OnInit {
 
   formatDate(value: string): string {
     return formatWallClock(value);
+  }
+
+  formatDay(value: string | null | undefined): string {
+    return formatWallClockDay(value);
+  }
+
+  formatMoney(value: number | null | undefined): string {
+    return new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency: 'MXN',
+    }).format(value ?? 0);
+  }
+
+  formatQty(value: number): string {
+    return new Intl.NumberFormat('es-MX', {
+      maximumFractionDigits: 4,
+    }).format(value);
+  }
+
+  facturaLabel(pedido: Pedido): string {
+    const serie = pedido.facturaSerie?.trim();
+    const folio = pedido.facturaFolio;
+    if (!folio) return '';
+    return serie ? `${serie}-${folio}` : String(folio);
+  }
+
+  private resetFacturaLookup(): void {
+    this.facturaFolioInput.set('');
+    this.lookingUpFactura.set(false);
+    this.facturaOptions.set([]);
+    this.selectedFactura.set(null);
+    this.lookupError.set('');
   }
 
   private errorMessage(err: unknown, fallback = 'Ocurrió un error'): string {

@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiClient } from './api-client';
+import type { FacturaPartida } from './catalogo.service';
 import type { PedidoEstatus } from './pedido.service';
 
 export type RutaEstatus = 'creada' | 'en_ruta' | 'ruta_finalizada';
@@ -11,6 +12,17 @@ export type RutaPedidoItem = {
   lugarEntrega: string;
   estatus: PedidoEstatus;
   ordenEntrega: number;
+  facturaFolio: number | null;
+  facturaSerie: string | null;
+  facturaFecha: string | null;
+  clienteCodigo: string | null;
+  clienteNombre: string | null;
+  clienteRfc: string | null;
+  facturaTotal: number | null;
+  partidas: FacturaPartida[];
+  recibidoPor: string | null;
+  firmadoAt: string | null;
+  firma: string | null;
 };
 
 export type RutaGpsPoint = {

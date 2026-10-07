@@ -131,19 +131,88 @@
         @if (r.pedidos.length === 0) {
           <p class="mt-4 text-sm text-gray-500">Esta ruta no tiene pedidos asignados.</p>
         } @else {
-          <ul class="mt-3 m-0 grid list-none gap-2 p-0">
+          <ul class="mt-3 m-0 grid list-none gap-3 p-0">
             @for (pedido of r.pedidos; track pedido.id) {
-              <li class="flex items-start gap-3 rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-800">
-                <span
-                  class="mt-1 inline-block h-3 w-3 shrink-0 rounded-full"
-                  [style.background]="colorForPedidoId(pedido.pedidoId)"
-                ></span>
-                <div>
-                  <div class="font-medium">
-                    {{ pedido.ordenEntrega }}. {{ pedido.lugarEntrega }}
+              <li class="rounded-md bg-gray-50 px-3 py-3 text-sm text-gray-800">
+                <div class="flex items-start gap-3">
+                  <span
+                    class="mt-1 inline-block h-3 w-3 shrink-0 rounded-full"
+                    [style.background]="colorForPedidoId(pedido.pedidoId)"
+                  ></span>
+                  <div class="min-w-0 flex-1">
+                    <div class="font-medium">
+                      {{ pedido.ordenEntrega }}. {{ pedido.lugarEntrega }}
+                    </div>
+                    <div class="text-xs text-gray-500">{{ pedidoEstatusLabel(pedido.estatus) }}</div>
                   </div>
-                  <div class="text-xs text-gray-500">{{ pedidoEstatusLabel(pedido.estatus) }}</div>
                 </div>
+
+                @if (pedido.estatus === 'entregado') {
+                  <div class="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px]">
+                    <div class="rounded-md border border-gray-200 bg-white px-3 py-2">
+                      <p class="m-0 text-[11px] font-medium uppercase tracking-wide text-gray-500">
+                        Recibió
+                      </p>
+                      <p class="m-0 mt-0.5 font-medium text-gray-800">
+                        {{ pedido.recibidoPor || 'Sin nombre' }}
+                      </p>
+                      @if (pedido.firmadoAt) {
+                        <p class="m-0 text-xs text-gray-500">{{ formatDate(pedido.firmadoAt) }}</p>
+                      }
+                    </div>
+                    <div class="rounded-md border border-gray-200 bg-white px-3 py-2">
+                      <p class="m-0 text-[11px] font-medium uppercase tracking-wide text-gray-500">
+                        Firma
+                      </p>
+                      @if (firmaSrc(pedido.firma); as src) {
+                        <img
+                          [src]="src"
+                          alt="Firma de quien recibió"
+                          class="mt-1 h-16 w-full object-contain"
+                        />
+                      } @else {
+                        <p class="m-0 mt-2 text-xs text-gray-500">Sin firma</p>
+                      }
+                    </div>
+                  </div>
+
+                  @if (pedido.partidas.length > 0) {
+                    <div class="mt-3 overflow-x-auto rounded-md border border-gray-200 bg-white">
+                      <table class="w-full min-w-[420px] border-collapse text-sm">
+                        <thead>
+                          <tr>
+                            <th class="bg-gray-50 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Producto
+                            </th>
+                            <th class="bg-gray-50 px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Cant.
+                            </th>
+                            <th class="bg-gray-50 px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Entregado
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (partida of pedido.partidas; track $index) {
+                            <tr class="border-t border-gray-100">
+                              <td class="px-3 py-2">{{ partida.producto || '—' }}</td>
+                              <td class="px-3 py-2 text-right">{{ partida.cantidad }}</td>
+                              <td class="px-3 py-2 text-center">
+                                @if (partida.entregado === true) {
+                                  <span class="font-semibold text-green-700">Sí</span>
+                                } @else if (partida.entregado === false) {
+                                  <span class="font-semibold text-red-600">No</span>
+                                } @else {
+                                  <span class="text-gray-400">—</span>
+                                }
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  }
+                }
               </li>
             }
           </ul>

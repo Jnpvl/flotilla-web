@@ -98,6 +98,11 @@ export class RutaDetallePage implements OnInit, OnDestroy {
     return formatWallClock(value);
   }
 
+  firmaSrc(firma: string | null): string | null {
+    if (!firma) return null;
+    return firma.startsWith('data:') ? firma : `data:image/png;base64,${firma}`;
+  }
+
   formatDuracion(minutos: number | null): string {
     if (minutos === null) return '—';
     const h = Math.floor(minutos / 60);
