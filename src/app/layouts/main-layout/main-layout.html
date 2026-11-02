@@ -82,18 +82,29 @@
         </div>
       }
 
-      @if (showUsuarios()) {
+      @if (showUsuarios() || showAsistencias()) {
         <div class="grid gap-1">
           <p class="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-200/60">
             Sistema
           </p>
-          <a
-            routerLink="/usuarios"
-            routerLinkActive="bg-brand-800 text-white"
-            class="rounded-lg px-3 py-2 text-sm font-medium text-brand-100/90 hover:bg-white/5 hover:text-white"
-          >
-            Usuarios
-          </a>
+          @if (showAsistencias()) {
+            <a
+              routerLink="/asistencias"
+              routerLinkActive="bg-brand-800 text-white"
+              class="rounded-lg px-3 py-2 text-sm font-medium text-brand-100/90 hover:bg-white/5 hover:text-white"
+            >
+              Asistencia
+            </a>
+          }
+          @if (showUsuarios()) {
+            <a
+              routerLink="/usuarios"
+              routerLinkActive="bg-brand-800 text-white"
+              class="rounded-lg px-3 py-2 text-sm font-medium text-brand-100/90 hover:bg-white/5 hover:text-white"
+            >
+              Usuarios
+            </a>
+          }
         </div>
       }
     </nav>

@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import {
+  asistenciasGuard,
   authGuard,
   flotillaGuard,
   guestGuard,
@@ -9,6 +10,7 @@ import {
   visitasGuard,
 } from './guards/auth.guard';
 import { MainLayout } from './layouts/main-layout/main-layout';
+import { AsistenciasPage } from './pages/asistencias/asistencias-page';
 import { HomePage } from './pages/home/home-page';
 import { LoginPage } from './pages/login/login-page';
 import { PedidosPage } from './pages/pedidos/pedidos-page';
@@ -32,6 +34,11 @@ export const routes: Routes = [
     children: [
       { path: '', component: HomePage, canActivate: [inicioGuard] },
       { path: 'usuarios', component: UsuariosPage, canActivate: [usuariosGuard] },
+      {
+        path: 'asistencias',
+        component: AsistenciasPage,
+        canActivate: [asistenciasGuard],
+      },
       { path: 'pedidos', component: PedidosPage, canActivate: [flotillaGuard] },
       { path: 'rutas', component: RutasPage, canActivate: [flotillaGuard] },
       { path: 'rutas/:id', component: RutaDetallePage, canActivate: [flotillaGuard] },

@@ -4,6 +4,7 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { filter } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import {
+  canAccessAsistencias,
   canAccessFlotilla,
   canAccessInicio,
   canAccessUsuarios,
@@ -27,6 +28,9 @@ export class MainLayout {
   readonly showVentas = computed(() => canAccessVentas(this.auth.user()?.rol));
   readonly showVisitas = computed(() => canAccessVisitas(this.auth.user()?.rol));
   readonly showUsuarios = computed(() => canAccessUsuarios(this.auth.user()?.rol));
+  readonly showAsistencias = computed(() =>
+    canAccessAsistencias(this.auth.user()?.rol),
+  );
 
   constructor() {
     this.router.events

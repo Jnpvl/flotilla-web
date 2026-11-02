@@ -3,6 +3,7 @@ import { CanActivateFn, Router } from '@angular/router';
 import { map } from 'rxjs';
 import { AuthService } from '../services/auth.service';
 import {
+  canAccessAsistencias,
   canAccessFlotilla,
   canAccessInicio,
   canAccessUsuarios,
@@ -71,5 +72,12 @@ export const usuariosGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
   const router = inject(Router);
   if (canAccessUsuarios(auth.user()?.rol)) return true;
+  return router.createUrlTree([defaultHomePath(auth.user()?.rol)]);
+};
+
+export const asistenciasGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  if (canAccessAsistencias(auth.user()?.rol)) return true;
   return router.createUrlTree([defaultHomePath(auth.user()?.rol)]);
 };

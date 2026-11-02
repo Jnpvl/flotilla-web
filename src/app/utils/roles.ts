@@ -22,6 +22,11 @@ export function canAccessUsuarios(rol: string | undefined | null): boolean {
   return rol === 'admin';
 }
 
+/** Listado administrativo de asistencia: solo admin. */
+export function canAccessAsistencias(rol: string | undefined | null): boolean {
+  return rol === 'admin';
+}
+
 /** Dashboard de inicio: solo admin. */
 export function canAccessInicio(rol: string | undefined | null): boolean {
   return rol === 'admin';
