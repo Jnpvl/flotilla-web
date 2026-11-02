@@ -9,6 +9,7 @@ import {
 } from '../../services/asistencia.service';
 import { AlertService } from '../../services/alert.service';
 import { Usuario, UsuarioService } from '../../services/usuario.service';
+import { exportAsistenciasExcel } from '../../utils/asistencia-excel';
 
 const MONTHS = [
   'Enero',
@@ -53,6 +54,7 @@ export class AsistenciasPage implements OnInit {
   readonly loading = signal(true);
   readonly savingConfig = signal(false);
   readonly savingFestivo = signal(false);
+  readonly exporting = signal(false);
   /** registro = listado del mes; configuracion = horarios/festivos */
   readonly tab = signal<'registro' | 'configuracion'>('registro');
 
@@ -91,6 +93,40 @@ export class AsistenciasPage implements OnInit {
 
   setTab(tab: 'registro' | 'configuracion'): void {
     this.tab.set(tab);
+  }
+
+  async exportExcel(): Promise<void> {
+    if (this.exporting()) return;
+    this.exporting.set(true);
+    try {
+      await exportAsistenciasExcel({
+        year: this.viewYear(),
+        month: this.viewMonth(),
+        monthLabel: this.monthLabel(),
+        usuarios: this.usuarios().map((u) => ({ id: u.id, nombre: u.nombre })),
+        items: this.items(),
+        config: {
+          entradaEsperada: this.configEntrada,
+          toleranciaRetardoMin: Number(this.configTolerancia),
+          salidaEsperada: this.configSalida,
+          diasLaborales: [...this.configDias],
+          exigeComida: this.configExigeComida,
+          comidaInicioEsperada: null,
+          comidaFinEsperada: null,
+          checadas: this.configExigeComida
+            ? ['entrada', 'comida_inicio', 'comida_fin', 'salida']
+            : ['entrada', 'salida'],
+        },
+        festivos: this.festivos(),
+      });
+    } catch (err: unknown) {
+      void this.alerts.error(
+        'Error',
+        this.errorMessage(err, 'No se pudo generar el Excel'),
+      );
+    } finally {
+      this.exporting.set(false);
+    }
   }
 
   ngOnInit(): void {
